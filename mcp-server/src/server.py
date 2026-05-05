@@ -1,0 +1,210 @@
+import logging
+from mcp.server.fastmcp import FastMCP
+from src.config import settings
+from src.loaders.base_loader import BaseLoader
+from src.models.adr import ADRContent, ADRSummary
+from src.models.config import GovernanceConfig
+from src.models.constitution import ConstitutionContent, ConstitutionDomain
+from src.models.convention import NamingConvention, KafkaConventions, CamelConventions, NamingType
+from src.models.check import Check, CheckDomain
+from src.models.helm import HelmTemplate, HelmServiceType
+from src.models.validation import ValidationResult
+from src.tools import adr_tools, constitution_tools, convention_tools, check_tools, helm_tools
+from src.validators import topic as topic_validator, rbac as rbac_validator, sa_naming as sa_validator
+
+logger = logging.getLogger(__name__)
+
+mcp = FastMCP("govern-mcp")
+
+_governance_config: GovernanceConfig | None = None
+
+
+def _loader() -> BaseLoader:
+    from src.loaders.local_loader import LocalLoader
+    from src.loaders.github_loader import GitHubLoader
+    if settings.governance_mode == "github":
+        return GitHubLoader(
+            settings.governance_repo_url,
+            settings.github_token,
+            settings.github_branch,
+            settings.cache_ttl_seconds,
+        )
+    return LocalLoader(settings.governance_repo_path)
+
+
+def _config() -> GovernanceConfig:
+    global _governance_config
+    if _governance_config is None:
+        _governance_config = _loader().get_config()
+        logger.info("governance config loaded: project=%s", _governance_config.project.name)
+    return _governance_config
+
+
+# ── ADR tools ──────────────────────────────────────────────────────────────────
+
+@mcp.tool(description=(
+    "Return the full content of a specific ADR by ID. "
+    "Accepts '001', 'ADR-001', or '1'. "
+    "Use search_adrs() first if you don't know the exact ID."
+))
+def get_adr(adr_id: str) -> ADRContent:
+    logger.info("get_adr id=%s", adr_id)
+    return adr_tools.get_adr(_loader(), adr_id)
+
+
+@mcp.tool(description=(
+    "Full-text search across all ADRs. "
+    "Returns a list of summaries (ID, title, status, domain). "
+    "Use this before get_adr() when you know the topic but not the ADR number."
+))
+def search_adrs(query: str) -> list[ADRSummary]:
+    logger.info("search_adrs query=%s", query)
+    return adr_tools.search_adrs(_loader(), query)
+
+
+@mcp.tool(description=(
+    "List all ADRs with their ID, title, status, and domain. "
+    "Use to discover what governance decisions exist before diving into specifics."
+))
+def list_adrs() -> list[ADRSummary]:
+    logger.info("list_adrs")
+    return adr_tools.list_adrs(_loader())
+
+
+# ── Constitution tools ─────────────────────────────────────────────────────────
+
+@mcp.tool(description=(
+    "Return the constitution for a domain. "
+    "Default is 'global' (platform-wide principles). "
+    "Available domains depend on what constitutions/ files the governance repo contains. "
+    "Always call this before making architectural decisions in the relevant domain."
+))
+def get_constitution(domain: ConstitutionDomain = "global") -> ConstitutionContent:
+    logger.info("get_constitution domain=%s", domain)
+    return constitution_tools.get_constitution(_loader(), domain)
+
+
+# ── Naming convention tools ────────────────────────────────────────────────────
+
+@mcp.tool(description=(
+    "Return the naming pattern and examples for a specific resource type. "
+    "Types: kafka_topic, kafka_consumer_group, kstreams_state_store, kstreams_named_operation, "
+    "camel_route, camel_application_name, connector_service_account, debug_service_account, "
+    "schema_subject, helm_release, deploy_tag."
+))
+def get_naming_conventions(type: NamingType) -> NamingConvention:
+    logger.info("get_naming_conventions type=%s", type)
+    return convention_tools.get_naming_convention(type)
+
+
+@mcp.tool(description=(
+    "Return all Kafka conventions in one call: topic naming, consumer groups, state stores, "
+    "named operations, schema subjects, valid prefixes, roles, and resource types. "
+    "Call this before creating any Kafka topic, RBAC binding, or Schema Registry subject."
+))
+def get_kafka_conventions() -> KafkaConventions:
+    logger.info("get_kafka_conventions")
+    return convention_tools.get_kafka_conventions()
+
+
+@mcp.tool(description=(
+    "Return all Camel conventions: route ID naming, application name pattern, "
+    "consumer group alignment, base class, and parent BOM. "
+    "Call this before adding or modifying a Camel route."
+))
+def get_camel_conventions() -> CamelConventions:
+    logger.info("get_camel_conventions")
+    return convention_tools.get_camel_conventions(_config().camel)
+
+
+# ── Check tools ────────────────────────────────────────────────────────────────
+
+@mcp.tool(description=(
+    "Return all Gherkin checks for a domain as defined in the governance repo. "
+    "Enforced checks have step definitions and run in CI. "
+    "Use these to validate code or config before submitting a PR."
+))
+def get_checks(domain: CheckDomain) -> list[Check]:
+    logger.info("get_checks domain=%s", domain)
+    return check_tools.get_checks(_loader(), domain)
+
+
+@mcp.tool(description=(
+    "Return SpringBoot required configuration checks. "
+    "Validates application.yml Kafka connectivity, actuator endpoints, "
+    "health probes, and prohibited patterns. "
+    "Call before modifying any application-docker.yml or application.yml."
+))
+def get_springboot_checks() -> list[Check]:
+    logger.info("get_springboot_checks")
+    return check_tools.get_checks(_loader(), "springboot")
+
+
+# ── Helm template tools ────────────────────────────────────────────────────────
+
+@mcp.tool(description=(
+    "Return a ready-to-use Helm values.yml template for a given service type. "
+    "Types: 'kafka_consumer', 'kafka_producer', 'kafka_processor' (KStreams with state store), "
+    "'camel_integration'. "
+    "Replace <CHANGE_ME> placeholders before committing."
+))
+def get_helm_template(service_type: HelmServiceType) -> HelmTemplate:
+    logger.info("get_helm_template service_type=%s", service_type)
+    return helm_tools.get_helm_template(service_type)
+
+
+# ── Validation tools ───────────────────────────────────────────────────────────
+
+@mcp.tool(description=(
+    "Validate a topic name against the rules in governance.yml. "
+    "Checks segment count, valid prefix, version suffix, lowercase, no hyphens, max length. "
+    "Returns valid=true or a list of errors."
+))
+def validate_topic_name(name: str) -> ValidationResult:
+    logger.info("validate_topic_name name=%s", name)
+    return topic_validator.validate_topic_name(name, _config().kafka.topic)
+
+
+@mcp.tool(description=(
+    "Validate a single RBAC binding (role_name + resource_type + resource_name) "
+    "against the rules in governance.yml. "
+    "Use before adding any role_binding to a service account or identity pool."
+))
+def validate_rbac_binding(
+    role_name: str,
+    resource_type: str,
+    resource_name: str,
+) -> ValidationResult:
+    logger.info("validate_rbac_binding role=%s type=%s name=%s", role_name, resource_type, resource_name)
+    return rbac_validator.validate_rbac_binding(
+        role_name, resource_type, resource_name, _config().kafka.rbac
+    )
+
+
+@mcp.tool(description=(
+    "Validate a service account name against the naming rules in governance.yml. "
+    "Checks prefix, environment suffix, connector direction, and debug suffix."
+))
+def validate_sa_name(name: str) -> ValidationResult:
+    logger.info("validate_sa_name name=%s", name)
+    return sa_validator.validate_sa_name(name, _config().kafka.service_account)
+
+
+# ── Webhook (GitHub mode cache invalidation) ───────────────────────────────────
+
+def get_webhook_app():
+    """Returns a FastAPI app with a /webhook/github endpoint for cache invalidation."""
+    from fastapi import FastAPI, Request
+    app = FastAPI()
+
+    @app.post("/webhook/github")
+    async def github_webhook(request: Request):
+        global _governance_config
+        loader = _loader()
+        if hasattr(loader, "invalidate"):
+            loader.invalidate()
+        _governance_config = None  # force config reload on next request
+        logger.info("Cache and config invalidated via GitHub webhook")
+        return {"status": "ok"}
+
+    return app

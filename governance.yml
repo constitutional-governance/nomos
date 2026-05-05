@@ -1,0 +1,71 @@
+# govern-mcp configuration
+# Edit this file to match your organization's conventions.
+# The MCP server reads it at startup — validators use these values.
+
+project:
+  name: "My Platform Governance"
+  description: "AI governance server for platform microservices"
+
+# ── Kafka domain ───────────────────────────────────────────────────────────────
+kafka:
+  topic:
+    # Number of dot-separated segments required in every topic name
+    segment_count: 7
+    # Valid first-segment prefixes — drives retention defaults and RBAC boundaries
+    prefixes:
+      - raw
+      - public
+      - ready
+      - private
+      - kstreams
+      - kcamel
+      - sink
+      - landing
+      - dev
+    # Prefixes that warn when used in production
+    non_production_prefixes:
+      - dev
+    # Maximum topic name length (Kafka hard limit)
+    max_length: 249
+
+  rbac:
+    # RBAC role names — adapt for your platform (e.g. MSK IAM actions)
+    valid_roles:
+      - DeveloperRead
+      - DeveloperWrite
+      - ResourceOwner
+      - DeveloperManage
+    valid_resource_types:
+      - topic
+      - group
+      - transactional-id
+      - cluster
+    # Roles that may only be granted on admin_resource_types
+    admin_roles:
+      - DeveloperManage
+    admin_resource_types:
+      - cluster
+    # The canonical name for the cluster resource
+    cluster_resource_name: kafka-cluster
+
+  service_account:
+    # All SA keys must start with this prefix
+    prefix: "sa-"
+    # Valid environment suffixes
+    valid_envs:
+      - dev
+      - qa
+      - prod
+    # Connector SA must have one of these direction segments
+    connector_directions:
+      - source
+      - sink
+    # Debug SA ends with this suffix
+    debug_suffix: "debug"
+
+# ── Camel domain ───────────────────────────────────────────────────────────────
+camel:
+  # Replace with your organization's Camel base class
+  base_class: "com.example.camel.BaseRouteBuilder"
+  # Replace with your organization's Camel BOM coordinates
+  parent_bom: "com.example:camel-starter-parent:1.0.0"
