@@ -1,11 +1,10 @@
 from pydantic import BaseModel
-from typing import Literal
 
-ConstitutionDomain = Literal["global", "kafka", "camel", "springboot", "helm"]
+ConstitutionDomain = str
 
 
 class ConstitutionContent(BaseModel):
-    domain: ConstitutionDomain
+    domain: str
     content: str
     version: str
     source_path: str

@@ -1,24 +1,28 @@
 from src.loaders.base_loader import BaseLoader
-from src.models.check import Check, CheckDomain
+from src.models.check import Check
 
-_CHECK_DIRS: dict[CheckDomain, str] = {
-    "kafka": "mcp-server/features/kafka",
-    "camel": "mcp-server/features/camel",
-    "springboot": "mcp-server/features/springboot",
-    "helm": "mcp-server/features/helm",
-}
-
-_DRAFT_DOMAINS = {"camel", "springboot", "helm"}
+_FEATURES_DIR = "mcp-server/features"
 
 
-def get_checks(loader: BaseLoader, domain: CheckDomain) -> list[Check]:
-    base_dir = _CHECK_DIRS[domain]
+def list_check_domains(loader: BaseLoader) -> list[str]:
+    paths = loader.list(_FEATURES_DIR)
+    domains = set()
+    for p in paths:
+        parts = p.split("/")
+        # mcp-server/features/{domain}/something.feature
+        if len(parts) >= 3 and parts[2] != "steps" and p.endswith(".feature"):
+            domains.add(parts[2])
+    return sorted(domains)
+
+
+def get_checks(loader: BaseLoader, domain: str) -> list[Check]:
+    base_dir = f"{_FEATURES_DIR}/{domain}"
     paths = [p for p in loader.list(base_dir) if p.endswith(".feature")]
     checks = []
     for path in sorted(paths):
         content = loader.read(path)
         title = _extract_title(content)
-        status = "draft" if domain in _DRAFT_DOMAINS else "enforced"
+        status = "enforced" if "@enforced" in content else "draft"
         checks.append(Check(
             domain=domain,
             feature_file=path.split("/")[-1],

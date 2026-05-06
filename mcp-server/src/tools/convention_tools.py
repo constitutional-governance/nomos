@@ -1,7 +1,7 @@
 from src.models.convention import (
     NamingConvention, KafkaConventions, CamelConventions, NamingType
 )
-from src.models.config import CamelConfig
+from src.models.config import CamelConfig, KafkaConfig
 
 # ── Kafka ──────────────────────────────────────────────────────────────────────
 
@@ -148,27 +148,32 @@ def get_naming_convention(naming_type: NamingType) -> NamingConvention:
     return _NAMING_MAP[naming_type]
 
 
-def get_kafka_conventions() -> KafkaConventions:
+_ALL_PREFIX_SEMANTICS: dict[str, str] = {
+    "raw": "Direct source ingestion — infinite retention — source of truth",
+    "public": "Cross-domain canonical events — 30d default",
+    "ready": "Aggregated / enriched for downstream — 30d default",
+    "private": "Internal domain — not shared with other domains",
+    "kstreams": "KStreams internals: changelog, repartition, DLQ",
+    "kcamel": "Camel K internal routing and DLQ",
+    "sink": "Destined for external sink connectors",
+    "landing": "External-agent ingest zone — 7d retention",
+    "dev": "Dev-only ephemeral — 1d retention — MUST NOT exist in prod",
+}
+
+
+def get_kafka_conventions(kafka_config: KafkaConfig | None = None) -> KafkaConventions:
+    config = kafka_config or KafkaConfig()
+    prefixes = config.topic.prefixes or list(_ALL_PREFIX_SEMANTICS.keys())
     return KafkaConventions(
         topic_naming=_KAFKA_TOPIC,
         consumer_group_naming=_KAFKA_CONSUMER_GROUP,
         state_store_naming=_KSTREAMS_STATE_STORE,
         named_operation_naming=_KSTREAMS_NAMED_OP,
         schema_subject_naming=_SCHEMA_SUBJECT,
-        valid_prefixes=["raw", "public", "ready", "private", "kstreams", "kcamel", "sink", "landing", "dev"],
-        valid_roles=["DeveloperRead", "DeveloperWrite", "ResourceOwner", "DeveloperManage"],
-        valid_resource_types=["topic", "group", "transactional-id", "cluster"],
-        prefix_semantics={
-            "raw": "Direct source ingestion — infinite retention — source of truth",
-            "public": "Cross-domain canonical events — 30d default",
-            "ready": "Aggregated / enriched for downstream — 30d default",
-            "private": "Internal domain — not shared with other domains",
-            "kstreams": "KStreams internals: changelog, repartition, DLQ",
-            "kcamel": "Camel K internal routing and DLQ",
-            "sink": "Destined for external sink connectors",
-            "landing": "External-agent ingest zone — 7d retention",
-            "dev": "Dev-only ephemeral — 1d retention — MUST NOT exist in prod",
-        },
+        valid_prefixes=prefixes,
+        valid_roles=config.rbac.valid_roles or ["DeveloperRead", "DeveloperWrite", "ResourceOwner", "DeveloperManage"],
+        valid_resource_types=config.rbac.valid_resource_types or ["topic", "group", "transactional-id", "cluster"],
+        prefix_semantics={p: _ALL_PREFIX_SEMANTICS[p] for p in prefixes if p in _ALL_PREFIX_SEMANTICS},
     )
 
 

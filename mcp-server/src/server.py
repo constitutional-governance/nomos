@@ -4,9 +4,9 @@ from src.config import settings
 from src.loaders.base_loader import BaseLoader
 from src.models.adr import ADRContent, ADRSummary
 from src.models.config import GovernanceConfig
-from src.models.constitution import ConstitutionContent, ConstitutionDomain
+from src.models.constitution import ConstitutionContent
 from src.models.convention import NamingConvention, KafkaConventions, CamelConventions, NamingType
-from src.models.check import Check, CheckDomain
+from src.models.check import Check
 from src.models.helm import HelmTemplate, HelmServiceType
 from src.models.validation import ValidationResult
 from src.tools import adr_tools, constitution_tools, convention_tools, check_tools, helm_tools
@@ -38,6 +38,36 @@ def _config() -> GovernanceConfig:
         _governance_config = _loader().get_config()
         logger.info("governance config loaded: project=%s", _governance_config.project.name)
     return _governance_config
+
+
+# ── Discovery tools ────────────────────────────────────────────────────────────
+
+@mcp.tool(description=(
+    "List all available constitution domains in this governance repo. "
+    "Call this first to discover what domains exist before calling get_constitution()."
+))
+def list_constitutions() -> list[str]:
+    logger.info("list_constitutions")
+    return constitution_tools.list_constitution_domains(_loader())
+
+
+@mcp.tool(description=(
+    "List all available check domains in this governance repo. "
+    "Call this first to discover what domains have Gherkin checks before calling get_checks()."
+))
+def list_check_domains() -> list[str]:
+    logger.info("list_check_domains")
+    return check_tools.list_check_domains(_loader())
+
+
+@mcp.tool(description=(
+    "Return the active validation rules loaded from governance.yml. "
+    "Shows what topic prefixes, RBAC roles, resource types, SA envs, and Camel config are in effect. "
+    "Call this when you need to understand what is and isn't allowed before generating config."
+))
+def get_active_rules() -> GovernanceConfig:
+    logger.info("get_active_rules")
+    return _config()
 
 
 # ── ADR tools ──────────────────────────────────────────────────────────────────
@@ -74,12 +104,11 @@ def list_adrs() -> list[ADRSummary]:
 # ── Constitution tools ─────────────────────────────────────────────────────────
 
 @mcp.tool(description=(
-    "Return the constitution for a domain. "
-    "Default is 'global' (platform-wide principles). "
-    "Available domains depend on what constitutions/ files the governance repo contains. "
+    "Return the constitution for a domain (e.g. 'global', 'kafka', 'camel'). "
+    "Default is 'global'. Call list_constitutions() to see what domains are available. "
     "Always call this before making architectural decisions in the relevant domain."
 ))
-def get_constitution(domain: ConstitutionDomain = "global") -> ConstitutionContent:
+def get_constitution(domain: str = "global") -> ConstitutionContent:
     logger.info("get_constitution domain=%s", domain)
     return constitution_tools.get_constitution(_loader(), domain)
 
@@ -104,7 +133,7 @@ def get_naming_conventions(type: NamingType) -> NamingConvention:
 ))
 def get_kafka_conventions() -> KafkaConventions:
     logger.info("get_kafka_conventions")
-    return convention_tools.get_kafka_conventions()
+    return convention_tools.get_kafka_conventions(_config().kafka)
 
 
 @mcp.tool(description=(
@@ -122,9 +151,9 @@ def get_camel_conventions() -> CamelConventions:
 @mcp.tool(description=(
     "Return all Gherkin checks for a domain as defined in the governance repo. "
     "Enforced checks have step definitions and run in CI. "
-    "Use these to validate code or config before submitting a PR."
+    "Call list_check_domains() to see what domains are available."
 ))
-def get_checks(domain: CheckDomain) -> list[Check]:
+def get_checks(domain: str) -> list[Check]:
     logger.info("get_checks domain=%s", domain)
     return check_tools.get_checks(_loader(), domain)
 
