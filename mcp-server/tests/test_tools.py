@@ -2,7 +2,7 @@ from pathlib import Path
 from src.loaders.local_loader import LocalLoader
 from src.tools import adr_tools, constitution_tools, convention_tools, check_tools
 
-REPO_ROOT = Path(__file__).parent.parent.parent
+REPO_ROOT = Path(__file__).parent.parent.parent / "examples" / "kafka"
 
 
 def loader():

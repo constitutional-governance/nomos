@@ -9,7 +9,19 @@ packages = ["src"]
 name = "nomos"
 version = "0.1.0"
 description = "Constitutional Governance server — exposes ADRs, constitutions, naming conventions, and executable compliance checks via MCP"
+readme = "README.md"
 requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+keywords = ["governance", "mcp", "ai-agents", "platform-engineering", "compliance"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: System :: Systems Administration",
+]
 dependencies = [
     "mcp[cli]>=1.6.0",
     "fastapi>=0.115.0",
@@ -19,6 +31,12 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "pyyaml>=6.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/your-org/nomos"
+Documentation = "https://github.com/your-org/constitutional-governance"
+Repository = "https://github.com/your-org/nomos"
+"Bug Tracker" = "https://github.com/your-org/nomos/issues"
 
 [project.optional-dependencies]
 dev = [

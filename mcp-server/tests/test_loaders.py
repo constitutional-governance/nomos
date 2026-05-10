@@ -1,7 +1,7 @@
 from pathlib import Path
 from src.loaders.local_loader import LocalLoader
 
-REPO_ROOT = Path(__file__).parent.parent.parent  # govern-mcp/
+REPO_ROOT = Path(__file__).parent.parent.parent / "examples" / "kafka"
 
 
 def test_local_loader_read_constitution():
@@ -27,5 +27,5 @@ def test_local_loader_list_adrs():
 
 def test_local_loader_list_checks():
     loader = LocalLoader(REPO_ROOT)
-    paths = loader.list("mcp-server/features/kafka")
+    paths = loader.list("features/kafka")
     assert any("topic-naming.feature" in p for p in paths)

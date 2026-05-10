@@ -1,7 +1,7 @@
 from src.loaders.base_loader import BaseLoader
 from src.models.check import Check
 
-_FEATURES_DIR = "mcp-server/features"
+_FEATURES_DIR = "features"
 
 
 def list_check_domains(loader: BaseLoader) -> list[str]:
@@ -9,9 +9,9 @@ def list_check_domains(loader: BaseLoader) -> list[str]:
     domains = set()
     for p in paths:
         parts = p.split("/")
-        # mcp-server/features/{domain}/something.feature
-        if len(parts) >= 3 and parts[2] != "steps" and p.endswith(".feature"):
-            domains.add(parts[2])
+        # features/{domain}/something.feature
+        if len(parts) >= 2 and parts[1] != "steps" and p.endswith(".feature"):
+            domains.add(parts[1])
     return sorted(domains)
 
 
