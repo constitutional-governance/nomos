@@ -59,6 +59,10 @@ exit 0
 def run(args) -> int:
     project_dir = Path(args.project_dir).resolve()
     server_url = args.server.rstrip("/") if args.server else "https://governance.your-org.com"
+    if args.team:
+        mcp_url = f"{server_url}/teams/{args.team}"
+    else:
+        mcp_url = server_url
 
     # .mcp.json
     mcp_path = project_dir / ".mcp.json"
@@ -66,7 +70,7 @@ def run(args) -> int:
         print(f"SKIP {mcp_path} already exists (use --force to overwrite)")
     else:
         config = json.loads(
-            json.dumps(_MCP_JSON).replace("{server_url}", server_url)
+            json.dumps(_MCP_JSON).replace("{server_url}", mcp_url)
         )
         mcp_path.write_text(json.dumps(config, indent=2) + "\n")
         status = "updated" if mcp_path.exists() else "created"
@@ -92,7 +96,9 @@ def run(args) -> int:
 
     print()
     if args.server:
-        print(f"Agent queries:  {server_url}/mcp")
+        print(f"Agent queries:  {mcp_url}/mcp")
+        if args.team:
+            print(f"Team context:   {args.team}")
         print(f"CLI validation: nomos-validate --server {server_url} topic <name>")
     else:
         print("Edit .mcp.json and .git/hooks/pre-commit to set your governance server URL.")
@@ -121,6 +127,11 @@ def register(subparsers) -> None:
         metavar="PATH",
         default=".",
         help="Project repository to install into (default: current directory)",
+    )
+    p.add_argument(
+        "--team",
+        metavar="NAME",
+        help="Team name — agent will query team-scoped rules at /teams/<name>/mcp",
     )
     p.add_argument(
         "--force",

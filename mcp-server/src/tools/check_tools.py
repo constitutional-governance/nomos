@@ -10,8 +10,11 @@ def list_check_domains(loader: BaseLoader) -> list[str]:
     for p in paths:
         parts = p.split("/")
         # features/{domain}/something.feature
-        if len(parts) >= 2 and parts[1] != "steps" and p.endswith(".feature"):
+        if parts[0] == "features" and len(parts) >= 3 and parts[1] != "steps" and p.endswith(".feature"):
             domains.add(parts[1])
+        # teams/{team}/features/{domain}/something.feature  (TeamAwareLoader paths)
+        elif parts[0] == "teams" and len(parts) >= 5 and parts[2] == "features" and parts[3] != "steps" and p.endswith(".feature"):
+            domains.add(parts[3])
     return sorted(domains)
 
 

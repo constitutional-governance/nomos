@@ -22,14 +22,21 @@ _governance_config: GovernanceConfig | None = None
 def _loader() -> BaseLoader:
     from src.loaders.local_loader import LocalLoader
     from src.loaders.github_loader import GitHubLoader
+    from src.loaders.team_loader import TeamAwareLoader
+    from src.context import _current_team
+
     if settings.governance_mode == "github":
-        return GitHubLoader(
+        base: BaseLoader = GitHubLoader(
             settings.governance_repo_url,
             settings.github_token,
             settings.github_branch,
             settings.cache_ttl_seconds,
         )
-    return LocalLoader(settings.governance_repo_path)
+    else:
+        base = LocalLoader(settings.governance_repo_path)
+
+    team = _current_team.get()
+    return TeamAwareLoader(base, team) if team else base
 
 
 def _config() -> GovernanceConfig:

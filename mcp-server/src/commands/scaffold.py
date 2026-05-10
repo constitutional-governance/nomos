@@ -110,7 +110,56 @@ _GOVERNANCE_YML_HINT = """\
 """
 
 
-def run(args) -> int:
+_TEAM_CONSTITUTION_README = """\
+# Team constitution addenda
+
+This directory contains domain-specific constitution addenda for `{name}`.
+
+Each file in this directory corresponds to a domain constitution in the root
+`constitutions/` directory and is **appended** to it when the Nomos server
+serves governance content in the `{name}` team context.
+
+## Naming convention
+
+`<domain>.md` — e.g. `kafka.md` appends to `constitutions/kafka.md`
+
+## Rules
+
+- Only add constraints. Do not relax or contradict domain rules.
+- If you need a rule changed at the domain level, open a PR to the domain constitution.
+- The Nomos server always serves the domain constitution first; your addendum follows.
+"""
+
+_TEAM_FEATURES_README = """\
+# Team Gherkin checks
+
+This directory contains `{name}`-specific Gherkin feature files.
+
+Organise by domain, mirroring the top-level `features/` structure:
+  `features/kafka/` → team-specific Kafka checks for `{name}`
+
+## Rules
+
+- Start all scenarios as `@wip`. Promote to `@enforced` via `nomos check-promotion`.
+- Domain `@enforced` checks always run — you cannot disable them.
+- Your checks add enforcement on top of domain checks, never instead of them.
+"""
+
+_TEAM_ADRS_README = """\
+# Team ADRs
+
+This directory contains architectural decision records scoped to `{name}`.
+
+Use this for decisions that:
+- Apply only to resources owned by this team
+- Are too specific to belong in a domain-level ADR
+- Document team-internal constraints or architectural choices
+
+Follow the same ADR format as domain-level ADRs (Status, Date, Decision, Rationale).
+"""
+
+
+def _run_domain(args) -> int:
     name = args.name.lower().replace(" ", "-")
     title = name.replace("-", " ").title()
     repo_path = Path(
@@ -153,20 +202,70 @@ def run(args) -> int:
     return 0
 
 
+def _run_team(args) -> int:
+    name = args.name.lower().replace(" ", "-")
+    repo_path = Path(
+        args.repo if args.repo else os.environ.get("GOVERNANCE_REPO_PATH", ".")
+    ).resolve()
+
+    ctx = {"name": name}
+    team_dir = repo_path / "teams" / name
+
+    dirs = [
+        (team_dir / "constitutions", _TEAM_CONSTITUTION_README.format(**ctx)),
+        (team_dir / "adrs", _TEAM_ADRS_README.format(**ctx)),
+        (team_dir / "features", _TEAM_FEATURES_README.format(**ctx)),
+    ]
+
+    any_created = False
+    for dir_path, readme_content in dirs:
+        readme = dir_path / "README.md"
+        if readme.exists():
+            print(f"SKIP {readme.relative_to(repo_path)} already exists")
+        else:
+            dir_path.mkdir(parents=True, exist_ok=True)
+            readme.write_text(readme_content)
+            print(f"OK   {readme.relative_to(repo_path)}")
+            any_created = True
+
+    if not any_created:
+        print()
+        print("Nothing created — all files already exist.")
+        return 0
+
+    print()
+    print("Next steps:")
+    print(f"  1. Add to .github/CODEOWNERS:  teams/{name}/  @your-org/{name}")
+    print(f"  2. Connect team agents:         nomos install-hooks --server URL --team {name}")
+    print(f"  3. Add domain addenda:          teams/{name}/constitutions/<domain>.md")
+    print(f"  4. Add team checks:             teams/{name}/features/<domain>/<name>-*.feature")
+    print(f"  5. Add team ADRs:               teams/{name}/adrs/NNN-title.md")
+    return 0
+
+
+def run(args) -> int:
+    if args.type == "domain":
+        return _run_domain(args)
+    if args.type == "team":
+        return _run_team(args)
+    print(f"ERR unknown scaffold type '{args.type}'")
+    return 1
+
+
 def register(subparsers) -> None:
     p = subparsers.add_parser(
         "scaffold",
-        help="Generate scaffolding files for a new governance domain",
+        help="Generate scaffolding files for a new governance domain or team",
     )
     p.add_argument(
         "type",
-        choices=["domain"],
+        choices=["domain", "team"],
         metavar="TYPE",
-        help="Artifact type to scaffold. Currently supported: domain",
+        help="Artifact type: 'domain' or 'team'",
     )
     p.add_argument(
         "name",
-        help="Domain name (e.g. kafka, camel, rest-api)",
+        help="Name (e.g. 'kafka' for domain, 'team-pos' for team)",
     )
     p.add_argument(
         "--repo",
