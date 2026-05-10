@@ -1,10 +1,10 @@
 """
-govern-mcp validator CLI — usable as pre-commit hook or in CI pipelines.
+nomos-validate — CLI validator, usable as pre-commit hook or in CI pipelines.
 
 Usage:
-    python -m src topic "raw.sales.pos.hmsu.commons.guestcheck.v1"
-    python -m src rbac DeveloperRead topic "raw.sales.*"
-    python -m src sa "sa-sales-lsretail-lookup-connector-source-jdbc-dev"
+    nomos-validate topic "acme.payments.checkout.team.receipts.transaction.v1"
+    nomos-validate rbac DeveloperRead topic "acme.payments.*"
+    nomos-validate sa "sa-payments-connector-source-jdbc-prod"
 
 Reads governance.yml from the repo root (GOVERNANCE_REPO_PATH in .env).
 Exit code: 0 if valid, 1 if any errors.

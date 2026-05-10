@@ -1,4 +1,4 @@
-# govern-mcp configuration
+# Nomos configuration
 # Edit this file to match your organization's conventions.
 # The MCP server reads it at startup — validators use these values.
 

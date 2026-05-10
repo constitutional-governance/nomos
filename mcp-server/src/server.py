@@ -14,7 +14,7 @@ from src.validators import topic as topic_validator, rbac as rbac_validator, sa_
 
 logger = logging.getLogger(__name__)
 
-mcp = FastMCP("govern-mcp")
+mcp = FastMCP("nomos")
 
 _governance_config: GovernanceConfig | None = None
 

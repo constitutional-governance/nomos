@@ -6,9 +6,9 @@ build-backend = "hatchling.build"
 packages = ["src"]
 
 [project]
-name = "govern-mcp"
+name = "nomos"
 version = "0.1.0"
-description = "MCP server exposing governance knowledge (ADRs, constitutions, checks, naming conventions)"
+description = "Constitutional Governance server — exposes ADRs, constitutions, naming conventions, and executable compliance checks via MCP"
 requires-python = ">=3.11"
 dependencies = [
     "mcp[cli]>=1.6.0",
@@ -30,8 +30,8 @@ dev = [
 ]
 
 [project.scripts]
-governance-mcp = "src.main:main"
-governance-validate = "src.__main__:main"
+nomos = "src.main:main"
+nomos-validate = "src.__main__:main"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
