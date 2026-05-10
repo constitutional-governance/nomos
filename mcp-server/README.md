@@ -1,74 +1,120 @@
-# govern-mcp server
+# nomos
 
-MCP server for the govern-mcp governance engine. Exposes ADRs, constitutions, naming conventions, Gherkin checks, and real-time validators as MCP tools.
+> Constitutional Governance server — exposes ADRs, constitutions, naming conventions, and executable compliance checks via MCP, REST, and CLI.
 
-## Local setup
+Part of the [Constitutional Governance](https://github.com/your-org/constitutional-governance) methodology.
 
-```bash
-python3 -m venv .venv
-.venv/bin/pip install -e ".[dev]"
-cp .env.example .env   # edit GOVERNANCE_REPO_PATH to point at the repo root
-.venv/bin/python -m src.main  # starts on http://127.0.0.1:8080
-```
+---
 
-Or use the root `setup.sh` — it does all of the above.
-
-## Configuration
-
-The server reads two things at startup:
-
-- **`.env`** — runtime settings (server port, governance mode, GitHub token, cache TTL)
-- **`governance.yml`** at the governance repo root — your org's naming rules (read via `GOVERNANCE_REPO_PATH`)
-
-In GitHub mode (`GOVERNANCE_MODE=github`), the server fetches files from the GitHub API and caches them for `CACHE_TTL_SECONDS`. A webhook to `POST /webhook/github` invalidates the cache.
-
-## Tests
+## Install
 
 ```bash
-# Unit tests
-.venv/bin/pytest tests/ -q
-
-# Behave (Gherkin executable checks, enforced only)
-.venv/bin/behave --tags=enforced
-
-# Everything including @wip scenarios
-.venv/bin/behave --no-skipped
+pip install nomos
 ```
 
-## CLI validator
+---
+
+## Quick start
 
 ```bash
-.venv/bin/governance-validate topic raw.sales.pos.hmsu.commons.guestcheck.v1
-.venv/bin/governance-validate rbac DeveloperRead topic "raw.sales.*"
-.venv/bin/governance-validate sa sa-sales-lsretail-lookup-connector-source-jdbc-dev
+# Point at a governance repo and start the server
+nomos --repo /path/to/your-governance-repo
+# → listening on http://127.0.0.1:8080
+
+# Or load from GitHub directly
+nomos --github https://github.com/your-org/your-governance-repo
 ```
 
-Exit 0 = valid, 1 = errors. Use as a pre-commit hook or in CI.
+Use [nomos-template](https://github.com/your-org/nomos-template) as your governance repo starting point.
 
-## Directory structure
+---
+
+## What it exposes
+
+### MCP tools (for AI agents)
+
+Connect any MCP-compatible agent (Claude Code, etc.) to `http://your-server/mcp`:
 
 ```
-src/
-├── server.py          # MCP tool definitions (FastMCP)
-├── __main__.py        # CLI entry point
-├── config.py          # Pydantic settings (.env)
-├── validators/        # topic.py, rbac.py, sa_naming.py
-├── loaders/           # local_loader.py, github_loader.py, base_loader.py
-├── models/            # config.py (GovernanceConfig), validation.py, adr.py, …
-└── tools/             # adr_tools.py, constitution_tools.py, check_tools.py, …
-
-features/
-├── environment.py     # Behave before_all — loads GovernanceConfig into context
-├── kafka/             # topic-naming, rbac-bindings, sa-naming, consumer-group-naming
-├── camel/             # error-handler-config (@wip)
-├── helm/              # resource-standards (@wip)
-└── springboot/        # required-properties (@wip)
+list_constitutions()           → ["global", "kafka", "camel", "springboot"]
+get_constitution("kafka")      → domain principles and invariants
+list_adrs()                    → [{id, title, status}, ...]
+get_adr("001")                 → full ADR content
+search_adrs("consumer group")  → ADRs matching the query
+get_kafka_conventions()        → prefixes, roles, patterns
+validate_topic_name("...")     → {valid, errors, warnings}
+validate_rbac_binding(...)     → {valid, errors}
+validate_sa_name("...")        → {valid, errors}
+get_checks("kafka")            → [{title, status, path}, ...]
+get_active_rules()             → full governance.yml as structured object
 ```
 
-## Adding a new validator
+### REST endpoints (for CI and scripts)
 
-1. Add rules to `governance.yml` and update the Pydantic model in `src/models/config.py`
-2. Write the validator in `src/validators/`
-3. Expose it as an MCP tool in `src/server.py` and a CLI command in `src/__main__.py`
-4. Add Gherkin scenarios in `features/<domain>/` with `@enforced` tag
-5. Add step definitions in `features/steps/validation_steps.py`
+```
+GET  /health
+POST /validate/topic      {"name": "raw.payments.v1"}
+POST /validate/rbac       {"role_name": "...", "resource_type": "...", "resource_name": "..."}
+POST /validate/sa         {"name": "sa-payments-connector-source-jdbc-prod"}
+POST /webhook/github      (GitHub push webhook — invalidates cache)
+```
+
+### CLI commands
+
+**Validate resources** (local or against a shared server):
+
+```bash
+nomos-validate topic "raw.payments.checkout.v1"
+nomos-validate rbac DeveloperRead topic "raw.payments.*"
+nomos-validate sa "sa-payments-connector-source-jdbc-prod"
+
+# Against a shared server (no local files needed)
+nomos-validate --server https://governance.acme.com topic "raw.payments.v1"
+```
+
+**Governance tooling**:
+
+```bash
+# Install .mcp.json + pre-commit hook in a project repo
+nomos install-hooks --server https://governance.acme.com
+
+# Scaffold a new domain (constitution + ADR + Gherkin template)
+nomos scaffold domain kafka
+
+# Verify a @wip scenario is ready to promote to @enforced
+nomos check-promotion features/kafka/topic-naming.feature --run
+```
+
+---
+
+## Deployment
+
+The platform team deploys **one** shared instance. Every team delegates to it — nobody runs their own copy.
+
+```bash
+# Docker (recommended for production)
+export GOVERNANCE_REPO_URL=https://github.com/your-org/your-governance-repo
+export GITHUB_TOKEN=ghp_...
+docker compose up -d
+```
+
+Full deployment guide: [nomos-template/DEPLOYMENT.md](https://github.com/your-org/nomos-template/blob/main/DEPLOYMENT.md)
+
+---
+
+## Server flags
+
+```
+nomos --repo PATH          Load governance repo from local path
+nomos --github URL         Load governance repo from GitHub (requires GITHUB_TOKEN for private repos)
+nomos --host HOST          Bind host (default: 127.0.0.1; use 0.0.0.0 in Docker)
+nomos --port PORT          Listen port (default: 8080)
+```
+
+Environment variables: `GOVERNANCE_REPO_PATH`, `GOVERNANCE_REPO_URL`, `GITHUB_TOKEN`, `GITHUB_BRANCH`, `CACHE_TTL_SECONDS`, `LOG_LEVEL`.
+
+---
+
+## Contributing
+
+→ [CONTRIBUTING.md](https://github.com/your-org/constitutional-governance/blob/main/.github/CONTRIBUTING.md)

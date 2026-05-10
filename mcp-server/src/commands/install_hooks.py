@@ -97,6 +97,12 @@ def run(args) -> int:
     else:
         print("Edit .mcp.json and .git/hooks/pre-commit to set your governance server URL.")
 
+    print()
+    print("NOTE: the pre-commit hook does not validate anything until you customise it.")
+    print("      Open .git/hooks/pre-commit and uncomment the validation sections")
+    print("      that match your project structure.")
+    print("      Docs: DEPLOYMENT.md#part-3")
+
     return 0
 
 
