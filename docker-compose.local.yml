@@ -1,0 +1,21 @@
+# Nomos — shared governance server (local filesystem mode)
+#
+# Use this when the governance repo is on a shared filesystem (NFS, mounted volume)
+# or when testing locally before pushing to GitHub.
+#
+# Usage:
+#   GOVERNANCE_REPO_PATH=/path/to/governance-repo docker compose -f docker-compose.local.yml up -d
+
+services:
+  nomos:
+    build:
+      context: mcp-server
+    ports:
+      - "8080:8080"
+    volumes:
+      - ${GOVERNANCE_REPO_PATH:?set GOVERNANCE_REPO_PATH}:/governance:ro
+    environment:
+      GOVERNANCE_MODE: local
+      GOVERNANCE_REPO_PATH: /governance
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    restart: unless-stopped

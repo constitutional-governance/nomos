@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     cache_ttl_seconds: int = 300    # github mode cache TTL
     auth_enabled: bool = False      # set True when OAuth 2.1 is configured
     oauth_endpoint: str = ""
+    mcp_server_host: str = "127.0.0.1"  # use 0.0.0.0 in Docker/production
     mcp_server_port: int = 8080
     log_level: str = "INFO"
 

@@ -126,19 +126,37 @@ The constitutions and ADRs are plain Markdown — edit or replace them with your
 
 ---
 
-## Running in production (GitHub mode)
+## Deploying a shared instance (the delegation model)
 
-Point Nomos at your governance repo on GitHub so the entire organization gets live updates:
+The platform team deploys **one** Nomos instance. All teams point their agents and hooks at it — nobody runs their own.
 
 ```bash
-# mcp-server/.env
-GOVERNANCE_MODE=github
-GOVERNANCE_REPO_URL=https://github.com/your-org/your-governance-repo
-GITHUB_TOKEN=ghp_...
-CACHE_TTL_SECONDS=300
+# Set your governance repo and token
+export GOVERNANCE_REPO_URL=https://github.com/your-org/your-governance-repo
+export GITHUB_TOKEN=ghp_...
+
+# Deploy
+docker compose up -d
+# → Nomos listening on :8080, reading rules from GitHub
 ```
 
-Add a webhook in GitHub → `POST https://your-nomos-server/webhook/github` to invalidate the cache on push to main.
+Add a webhook in GitHub → `POST https://your-nomos-server/webhook/github` to invalidate the cache on every push to main.
+
+For a local filesystem governance repo (e.g. NFS mount):
+
+```bash
+GOVERNANCE_REPO_PATH=/mnt/governance docker compose -f docker-compose.local.yml up -d
+```
+
+### REST endpoints (for CLI remote mode and health checks)
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/health` | GET | Health check — returns `{"status": "ok"}` |
+| `/validate/topic` | POST | `{"name": "..."}` → `ValidationResult` |
+| `/validate/rbac` | POST | `{"role_name": "...", "resource_type": "...", "resource_name": "..."}` → `ValidationResult` |
+| `/validate/sa` | POST | `{"name": "..."}` → `ValidationResult` |
+| `/webhook/github` | POST | Invalidates the cache on push |
 
 ---
 
@@ -150,39 +168,45 @@ cd mcp-server
 # All @enforced scenarios — suitable for CI
 .venv/bin/behave --tags=enforced
 
-# All scenarios including @wip — local exploration
-.venv/bin/behave --no-skipped
-
 # Unit tests
 .venv/bin/pytest tests/ -q
 ```
 
 ## CLI validator
 
+**Local mode** (reads governance.yml from disk — useful during development):
+
 ```bash
-# Validate topic names (exit 0 = valid, 1 = errors)
-.venv/bin/nomos-validate topic acme.payments.checkout.team.receipts.transaction.v1
-
-# Validate an RBAC binding
-.venv/bin/nomos-validate rbac DeveloperRead topic "acme.payments.*"
-
-# Validate a service account name
-.venv/bin/nomos-validate sa sa-payments-connector-source-jdbc-prod
+nomos-validate topic raw.payments.pos.checkout.receipts.transaction.v1
+nomos-validate rbac DeveloperRead topic "raw.payments.*"
+nomos-validate sa sa-payments-connector-source-jdbc-prod
 ```
 
-Use `nomos-validate` as a pre-commit hook to catch violations before they reach CI.
+**Remote mode** (delegates to the shared Nomos server — use in pre-commit hooks):
+
+```bash
+nomos-validate --server https://governance.acme.com topic raw.payments.pos.checkout.receipts.transaction.v1
+nomos-validate --server https://governance.acme.com sa sa-payments-connector-source-jdbc-prod
+```
+
+Exit code 0 = valid, 1 = errors. Pre-commit hook example:
+
+```bash
+#!/bin/sh
+nomos-validate --server https://governance.acme.com topic $(grep 'topic_name' "$1" | ...)
+```
 
 ---
 
 ## The delegation model
 
-Teams do not copy governance rules. They delegate to a single Nomos instance operated by the platform team. When a rule changes, it changes once and every agent, hook, and pipeline sees the update immediately.
+The platform team deploys one Nomos instance. When a rule changes in the governance repo, every agent, hook, and pipeline sees the update immediately — no redistribution, no stale copies.
 
 ```
 platform-governance-repo  ←  rules live here
         │
         ▼
-    Nomos server          ←  exposes rules as MCP tools + CLI
+    Nomos server          ←  exposes rules as MCP tools + REST + CLI
         │
    ┌────┴────┐
    ▼         ▼

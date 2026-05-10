@@ -218,22 +218,3 @@ def validate_sa_name(name: str) -> ValidationResult:
     logger.info("validate_sa_name name=%s", name)
     return sa_validator.validate_sa_name(name, _config().kafka.service_account)
 
-
-# ── Webhook (GitHub mode cache invalidation) ───────────────────────────────────
-
-def get_webhook_app():
-    """Returns a FastAPI app with a /webhook/github endpoint for cache invalidation."""
-    from fastapi import FastAPI, Request
-    app = FastAPI()
-
-    @app.post("/webhook/github")
-    async def github_webhook(request: Request):
-        global _governance_config
-        loader = _loader()
-        if hasattr(loader, "invalidate"):
-            loader.invalidate()
-        _governance_config = None  # force config reload on next request
-        logger.info("Cache and config invalidated via GitHub webhook")
-        return {"status": "ok"}
-
-    return app

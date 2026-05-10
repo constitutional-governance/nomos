@@ -1,0 +1,33 @@
+# Nomos — shared governance server (GitHub mode)
+#
+# The platform team runs this once. All teams point their agents and
+# pre-commit hooks at this server instead of running their own instance.
+#
+# Usage:
+#   export GOVERNANCE_REPO_URL=https://github.com/your-org/your-governance-repo
+#   export GITHUB_TOKEN=ghp_...
+#   docker compose up -d
+#
+# Then configure teams:
+#   .mcp.json  → {"mcpServers": {"nomos": {"type": "http", "url": "http://your-server:8080/mcp"}}}
+#   pre-commit → nomos-validate --server http://your-server:8080 topic <name>
+
+services:
+  nomos:
+    build:
+      context: mcp-server
+    ports:
+      - "8080:8080"
+    environment:
+      GOVERNANCE_MODE: github
+      GOVERNANCE_REPO_URL: ${GOVERNANCE_REPO_URL}
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      GITHUB_BRANCH: ${GITHUB_BRANCH:-main}
+      CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS:-300}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

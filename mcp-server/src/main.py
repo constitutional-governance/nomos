@@ -12,8 +12,18 @@ logging.basicConfig(
 
 def main() -> None:
     import uvicorn
-    app = mcp.streamable_http_app()
-    uvicorn.run(app, host="127.0.0.1", port=settings.mcp_server_port)
+    from starlette.applications import Starlette
+    from starlette.routing import Mount
+    from src.routes.validate import routes as rest_routes
+
+    mcp_app = mcp.streamable_http_app()
+
+    app = Starlette(routes=[
+        *rest_routes,
+        Mount("/", mcp_app),
+    ])
+
+    uvicorn.run(app, host=settings.mcp_server_host, port=settings.mcp_server_port)
 
 
 if __name__ == "__main__":
