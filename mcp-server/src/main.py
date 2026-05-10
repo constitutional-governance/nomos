@@ -12,10 +12,20 @@ logging.basicConfig(
 
 
 def main() -> None:
+    from src.commands import install_hooks, check_promotion, scaffold
+
     parser = argparse.ArgumentParser(
         prog="nomos",
-        description="Nomos — Constitutional Governance server",
+        description="Nomos — Constitutional Governance server and tooling",
     )
+    subparsers = parser.add_subparsers(dest="command")
+
+    # Register CLI commands
+    install_hooks.register(subparsers)
+    check_promotion.register(subparsers)
+    scaffold.register(subparsers)
+
+    # Server flags (used when no subcommand is given)
     parser.add_argument(
         "--repo",
         type=Path,
@@ -38,8 +48,14 @@ def main() -> None:
         default=settings.mcp_server_host,
         help=f"Host to bind to (default: {settings.mcp_server_host})",
     )
+
     args = parser.parse_args()
 
+    # Dispatch to subcommand if one was given
+    if args.command:
+        sys.exit(args.func(args))
+
+    # Default: start the governance server
     if args.repo:
         settings.governance_repo_path = args.repo.resolve()
         settings.governance_mode = "local"
