@@ -66,11 +66,11 @@ validate_service_name("...")      → {valid, errors, warnings}
 
 **Recommended workflow for agents:** call `get_knowledge("failures")` first, then generate, then validate.
 
-### CLI (GitHub Copilot and any tool with terminal access)
+### GitHub Copilot in VS Code
 
-`nomos-validate` is the model-agnostic alternative to MCP. Any agent that can run shell commands uses it directly — no server connection required for local mode.
+Copilot supports MCP via `.vscode/mcp.json`. Same protocol, different config file location.
 
-Configure with `nomos install-hooks --tool copilot` — generates `.github/copilot-instructions.md` with the CLI validation workflow.
+Configure with `nomos install-hooks --tool vscode`.
 
 ### REST endpoints (for CI and scripts)
 
@@ -106,14 +106,14 @@ nomos-validate --server https://governance.acme.com service-name "retail-order-a
 **Governance tooling**:
 
 ```bash
-# Install config for all tools (MCP + Copilot) + pre-commit hook
+# Install config for all tools + pre-commit hook
 nomos install-hooks --server https://governance.acme.com
 
-# MCP-compatible agents only (Claude Code, Cursor, Windsurf, ...)
-nomos install-hooks --server https://governance.acme.com --tool mcp
+# Claude Code only (.mcp.json)
+nomos install-hooks --server https://governance.acme.com --tool claude
 
-# GitHub Copilot only (.github/copilot-instructions.md)
-nomos install-hooks --server https://governance.acme.com --tool copilot
+# VS Code / GitHub Copilot only (.vscode/mcp.json)
+nomos install-hooks --server https://governance.acme.com --tool vscode
 
 # Scaffold a new domain (constitution + ADR + Gherkin template)
 nomos scaffold domain kafka
@@ -192,16 +192,25 @@ nomos install-hooks --server https://governance.your-org.com
 ```
 
 This creates:
-- `.mcp.json` — MCP config for Claude Code, Cursor, Windsurf, and other MCP agents
-- `.github/copilot-instructions.md` — custom instructions for GitHub Copilot (REST API workflow)
+- `.mcp.json` — MCP config for Claude Code
+- `.vscode/mcp.json` — MCP config for VS Code / GitHub Copilot
 - `.git/hooks/pre-commit` — validates staged resources before every commit (model-agnostic)
 
-For MCP-compatible agents, add an instruction file (`CLAUDE.md`, `AGENTS.md`, `.cursorrules`, etc.) depending on your tool:
+Both config files point at the same server and expose the same MCP tools. Add an agent instruction file appropriate for your tool:
+
+| Tool | Instruction file |
+|---|---|
+| Claude Code | `CLAUDE.md` |
+| GitHub Copilot / VS Code | `.github/copilot-instructions.md` |
+| Cursor | `.cursorrules` or `.cursor/rules/*.md` |
+| Generic (Codex, etc.) | `AGENTS.md` |
+
+Minimal instruction file content (same for all tools):
 
 ```markdown
 ## Governance
 
-This repo is connected to the platform governance server via `.mcp.json`.
+Connected to the platform governance server (see .mcp.json / .vscode/mcp.json).
 
 Before generating or modifying resources:
 1. get_knowledge("failures")     ← always call this first
@@ -209,8 +218,6 @@ Before generating or modifying resources:
 3. get_constitution("<domain>")  ← domain-specific rules (kafka, rest-api, ...)
 4. validate_*                    ← self-validate before returning output
 ```
-
-For Copilot and other non-MCP tools, `.github/copilot-instructions.md` (generated above) contains the equivalent workflow using `nomos-validate` from the terminal.
 
 ---
 

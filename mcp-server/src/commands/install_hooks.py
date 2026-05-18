@@ -4,20 +4,31 @@ nomos install-hooks — install AI agent config and pre-commit hook in a project
 Usage:
     nomos install-hooks --server https://governance.acme.com
     nomos install-hooks --server https://governance.acme.com --tool all
-    nomos install-hooks --server https://governance.acme.com --tool copilot
+    nomos install-hooks --server https://governance.acme.com --tool vscode
     nomos install-hooks --force   # overwrite existing files
 
 --tool options:
-    all      Install config for all supported tools (default)
-    mcp      .mcp.json only — for MCP-compatible agents (Claude Code, Cursor, Windsurf, ...)
-    copilot  .github/copilot-instructions.md only — for GitHub Copilot
+    all     Install config for all supported tools (default)
+    claude  .mcp.json — Claude Code
+    vscode  .vscode/mcp.json — VS Code with GitHub Copilot (and other VS Code MCP agents)
 """
 import json
 import stat
 from pathlib import Path
 
-_MCP_JSON = {
+# Claude Code reads .mcp.json at the repo root
+_MCP_JSON_CLAUDE = {
     "mcpServers": {
+        "nomos": {
+            "type": "http",
+            "url": "{server_url}/mcp",
+        }
+    }
+}
+
+# VS Code reads .vscode/mcp.json — used by GitHub Copilot and other VS Code MCP extensions
+_MCP_JSON_VSCODE = {
+    "servers": {
         "nomos": {
             "type": "http",
             "url": "{server_url}/mcp",
@@ -151,20 +162,21 @@ def _write_mcp_json(project_dir: Path, mcp_url: str, force: bool) -> None:
     if mcp_path.exists() and not force:
         print(f"SKIP {mcp_path} already exists (use --force to overwrite)")
         return
-    config = json.loads(json.dumps(_MCP_JSON).replace("{server_url}", mcp_url))
+    config = json.loads(json.dumps(_MCP_JSON_CLAUDE).replace("{server_url}", mcp_url))
     mcp_path.write_text(json.dumps(config, indent=2) + "\n")
-    print(f"OK   {mcp_path}")
+    print(f"OK   {mcp_path}  (Claude Code)")
 
 
-def _write_copilot_instructions(project_dir: Path, server_url: str, force: bool) -> None:
-    github_dir = project_dir / ".github"
-    github_dir.mkdir(exist_ok=True)
-    instructions_path = github_dir / "copilot-instructions.md"
-    if instructions_path.exists() and not force:
-        print(f"SKIP {instructions_path} already exists (use --force to overwrite)")
+def _write_vscode_mcp(project_dir: Path, mcp_url: str, force: bool) -> None:
+    vscode_dir = project_dir / ".vscode"
+    vscode_dir.mkdir(exist_ok=True)
+    mcp_path = vscode_dir / "mcp.json"
+    if mcp_path.exists() and not force:
+        print(f"SKIP {mcp_path} already exists (use --force to overwrite)")
         return
-    instructions_path.write_text(_COPILOT_INSTRUCTIONS.replace("{server_url}", server_url))
-    print(f"OK   {instructions_path}")
+    config = json.loads(json.dumps(_MCP_JSON_VSCODE).replace("{server_url}", mcp_url))
+    mcp_path.write_text(json.dumps(config, indent=2) + "\n")
+    print(f"OK   {mcp_path}  (VS Code / GitHub Copilot)")
 
 
 def run(args) -> int:
@@ -176,11 +188,11 @@ def run(args) -> int:
     else:
         mcp_url = server_url
 
-    if tool in ("all", "mcp"):
+    if tool in ("all", "claude"):
         _write_mcp_json(project_dir, mcp_url, args.force)
 
-    if tool in ("all", "copilot"):
-        _write_copilot_instructions(project_dir, server_url, args.force)
+    if tool in ("all", "vscode"):
+        _write_vscode_mcp(project_dir, mcp_url, args.force)
 
     # pre-commit hook
     git_dir = project_dir / ".git"
@@ -202,13 +214,13 @@ def run(args) -> int:
 
     print()
     if args.server:
-        if tool in ("all", "mcp"):
-            print(f"MCP endpoint:   {mcp_url}/mcp  (Claude Code, Cursor, Windsurf, ...)")
-        if tool in ("all", "copilot"):
-            print(f"Copilot rules:  {project_dir}/.github/copilot-instructions.md")
+        print(f"MCP endpoint:   {mcp_url}/mcp")
+        if tool in ("all", "claude"):
+            print(f"                → .mcp.json  (Claude Code)")
+        if tool in ("all", "vscode"):
+            print(f"                → .vscode/mcp.json  (VS Code / GitHub Copilot)")
         if args.team:
             print(f"Team context:   {args.team}")
-        print(f"REST validate:  {server_url}/validate/topic  (model-agnostic)")
     else:
         print("Edit generated files to set your governance server URL.")
 
@@ -238,9 +250,9 @@ def register(subparsers) -> None:
     )
     p.add_argument(
         "--tool",
-        choices=["all", "mcp", "copilot"],
+        choices=["all", "claude", "vscode"],
         default="all",
-        help="Which AI tool to configure: all (default), mcp (Claude Code/Cursor/Windsurf), copilot",
+        help="Which AI tool to configure: all (default), claude (.mcp.json), vscode (.vscode/mcp.json for Copilot)",
     )
     p.add_argument(
         "--force",
