@@ -66,9 +66,11 @@ validate_service_name("...")      → {valid, errors, warnings}
 
 **Recommended workflow for agents:** call `get_knowledge("failures")` first, then generate, then validate.
 
-### REST API (GitHub Copilot and any HTTP client)
+### CLI (GitHub Copilot and any tool with terminal access)
 
-Configure with `nomos install-hooks --tool copilot` — generates `.github/copilot-instructions.md` with the validation workflow.
+`nomos-validate` is the model-agnostic alternative to MCP. Any agent that can run shell commands uses it directly — no server connection required for local mode.
+
+Configure with `nomos install-hooks --tool copilot` — generates `.github/copilot-instructions.md` with the CLI validation workflow.
 
 ### REST endpoints (for CI and scripts)
 
@@ -151,7 +153,7 @@ nomos install-hooks --server https://governance.your-org.com
 
 ### 2. REST API service repo
 
-Add to your repo's `CLAUDE.md`:
+**MCP agents** (Claude Code, Cursor, ...) — add to your instruction file (`CLAUDE.md`, `AGENTS.md`, etc.):
 
 ```markdown
 ## Before adding or modifying REST endpoints
@@ -164,24 +166,20 @@ validate_rest_path(path)       ← for every new endpoint path
 validate_service_name(name)    ← when naming a new service or Helm release
 ```
 
-Example agent session:
+**Copilot and other tools** — use the CLI from the terminal:
+
+```bash
+nomos-validate --server https://governance.your-org.com rest-path "/v1/customer-orders/{orderId}/line-items"
+nomos-validate --server https://governance.your-org.com service-name "retail-order-api"
+```
+
+Example validation output:
 
 ```
-→ get_rest_conventions()
-  path_pattern: /v{n}/{resource}[/{id}[/{sub-resource}]]
-  versioning_strategy: path
-  method_semantics: { GET: "read, idempotent", POST: "create", ... }
+ERR /v1/CustomerOrders
+    path must be lowercase — use kebab-case for all static segments
 
-→ validate_rest_path("/v1/CustomerOrders")
-  valid: false
-  errors: ["path must be lowercase — use kebab-case for all static segments"]
-
-→ validate_rest_path("/v1/customer-orders")
-  valid: true
-  warnings: ["segment 'customer-orders' looks like a singular noun — ..."]
-
-→ validate_rest_path("/v1/customer-orders/{orderId}/line-items")
-  valid: true
+OK  /v1/customer-orders/{orderId}/line-items
 ```
 
 ### 3. Onboarding a new service repo
@@ -212,7 +210,7 @@ Before generating or modifying resources:
 4. validate_*                    ← self-validate before returning output
 ```
 
-For Copilot and other non-MCP tools, `.github/copilot-instructions.md` (generated above) contains the equivalent workflow using the REST API.
+For Copilot and other non-MCP tools, `.github/copilot-instructions.md` (generated above) contains the equivalent workflow using `nomos-validate` from the terminal.
 
 ---
 

@@ -104,56 +104,41 @@ exit 0
 _COPILOT_INSTRUCTIONS = """\
 # Platform Governance
 
-This repository is connected to the Nomos governance server at {server_url}.
-Validation rules are served by the governance server — always validate before proposing output.
+This repository uses the Nomos governance CLI (`nomos-validate`).
+Always validate resources before proposing them.
 
 ## Before generating or modifying resources
 
-1. Read the relevant constitution:
-   GET {server_url}/constitution/global
-   GET {server_url}/constitution/kafka      (Kafka topics, RBAC, service accounts)
-   GET {server_url}/constitution/rest-api   (REST endpoints, service naming)
+Validate using the CLI. Run these commands in the terminal:
 
-2. Validate your output via the REST API before returning it:
+```bash
+# Kafka topic name
+nomos-validate --server {server_url} topic "raw.retail.pos.acme.orders.receipt.v1"
 
-### Kafka topic name
-curl -s -X POST {server_url}/validate/topic \\
-  -H 'Content-Type: application/json' \\
-  -d '{"name": "raw.retail.pos.acme.orders.receipt.v1"}'
+# RBAC binding
+nomos-validate --server {server_url} rbac DeveloperRead topic "raw.retail.*"
 
-### RBAC binding
-curl -s -X POST {server_url}/validate/rbac \\
-  -H 'Content-Type: application/json' \\
-  -d '{"role_name": "DeveloperRead", "resource_type": "topic", "resource_name": "raw.retail.*"}'
+# Service account name
+nomos-validate --server {server_url} sa "sa-retail-connector-source-jdbc-prod"
 
-### Service account name
-curl -s -X POST {server_url}/validate/sa \\
-  -H 'Content-Type: application/json' \\
-  -d '{"name": "sa-retail-connector-source-jdbc-prod"}'
+# Schema entry
+nomos-validate --server {server_url} schema AVRO BACKWARD
 
-### Schema entry
-curl -s -X POST {server_url}/validate/schema \\
-  -H 'Content-Type: application/json' \\
-  -d '{"format": "AVRO", "compatibility_level": "BACKWARD"}'
+# REST API path
+nomos-validate --server {server_url} rest-path "/v1/orders/{orderId}/items"
 
-### REST API path
-curl -s -X POST {server_url}/validate/rest-path \\
-  -H 'Content-Type: application/json' \\
-  -d '{"path": "/v1/orders/{orderId}/items"}'
-
-### Microservice name
-curl -s -X POST {server_url}/validate/service-name \\
-  -H 'Content-Type: application/json' \\
-  -d '{"name": "retail-order-api"}'
-
-## Validation response
-
-```json
-{"valid": true, "errors": [], "warnings": []}
+# Microservice name
+nomos-validate --server {server_url} service-name "retail-order-api"
 ```
 
-`200 OK` → valid. `422 Unprocessable Entity` → invalid, check `errors` field.
-Always fix errors before proposing the resource. Warnings are advisory.
+Exit code `0` means valid. Exit code `1` means invalid — read the output and fix before returning.
+Warnings (prefixed `WARNING:`) are advisory.
+
+## Install
+
+```bash
+pip install nomos
+```
 
 ## Key rules
 
