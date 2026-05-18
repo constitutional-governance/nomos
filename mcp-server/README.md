@@ -31,9 +31,9 @@ Use [nomos-template](https://github.com/your-org/nomos-template) as your governa
 
 ## What it exposes
 
-### MCP tools (for AI agents)
+### MCP tools (Claude Code, Cursor, Windsurf, and any MCP-compatible agent)
 
-Connect any MCP-compatible agent (Claude Code, etc.) to `http://your-server/mcp`:
+Connect via `http://your-server/mcp`. Configure with `nomos install-hooks --tool mcp`.
 
 ```
 # Discovery
@@ -60,19 +60,27 @@ validate_topic_name("...")        → {valid, errors, warnings}
 validate_rbac_binding(...)        → {valid, errors}
 validate_sa_name("...")           → {valid, errors}
 validate_schema_entry("AVRO", "BACKWARD")  → {valid, errors, warnings}
+validate_rest_path("/v1/orders")  → {valid, errors, warnings}
+validate_service_name("...")      → {valid, errors, warnings}
 ```
 
 **Recommended workflow for agents:** call `get_knowledge("failures")` first, then generate, then validate.
+
+### REST API (GitHub Copilot and any HTTP client)
+
+Configure with `nomos install-hooks --tool copilot` — generates `.github/copilot-instructions.md` with the validation workflow.
 
 ### REST endpoints (for CI and scripts)
 
 ```
 GET  /health
-POST /validate/topic      {"name": "raw.payments.v1"}
-POST /validate/rbac       {"role_name": "...", "resource_type": "...", "resource_name": "..."}
-POST /validate/sa         {"name": "sa-payments-connector-source-jdbc-prod"}
-POST /validate/schema     {"format": "AVRO", "compatibility_level": "BACKWARD"}
-POST /webhook/github      (GitHub push webhook — invalidates cache)
+POST /validate/topic        {"name": "raw.payments.v1"}
+POST /validate/rbac         {"role_name": "...", "resource_type": "...", "resource_name": "..."}
+POST /validate/sa           {"name": "sa-payments-connector-source-jdbc-prod"}
+POST /validate/schema       {"format": "AVRO", "compatibility_level": "BACKWARD"}
+POST /validate/rest-path    {"path": "/v1/orders/{orderId}/items"}
+POST /validate/service-name {"name": "retail-order-api"}
+POST /webhook/github        (GitHub push webhook — invalidates cache)
 ```
 
 ### CLI commands
@@ -84,17 +92,26 @@ nomos-validate topic "raw.payments.pos.checkout.receipts.transaction.v1"
 nomos-validate rbac DeveloperRead topic "raw.payments.*"
 nomos-validate sa "sa-payments-connector-source-jdbc-prod"
 nomos-validate schema AVRO BACKWARD
+nomos-validate rest-path "/v1/orders/{orderId}/items"
+nomos-validate service-name "retail-order-api"
 
-# Against a shared server (no local files needed)
+# Against a shared server (no local files needed — works from any tool)
 nomos-validate --server https://governance.acme.com topic "raw.payments.pos.checkout.receipts.transaction.v1"
-nomos-validate --server https://governance.acme.com schema AVRO BACKWARD_TRANSITIVE
+nomos-validate --server https://governance.acme.com rest-path "/v1/orders"
+nomos-validate --server https://governance.acme.com service-name "retail-order-api"
 ```
 
 **Governance tooling**:
 
 ```bash
-# Install .mcp.json + pre-commit hook in a project repo
+# Install config for all tools (MCP + Copilot) + pre-commit hook
 nomos install-hooks --server https://governance.acme.com
+
+# MCP-compatible agents only (Claude Code, Cursor, Windsurf, ...)
+nomos install-hooks --server https://governance.acme.com --tool mcp
+
+# GitHub Copilot only (.github/copilot-instructions.md)
+nomos install-hooks --server https://governance.acme.com --tool copilot
 
 # Scaffold a new domain (constitution + ADR + Gherkin template)
 nomos scaffold domain kafka
@@ -169,7 +186,7 @@ Example agent session:
 
 ### 3. Onboarding a new service repo
 
-One command installs the `.mcp.json` and pre-commit hook:
+One command configures all supported AI tools:
 
 ```bash
 cd /path/to/your-service-repo
@@ -177,10 +194,11 @@ nomos install-hooks --server https://governance.your-org.com
 ```
 
 This creates:
-- `.mcp.json` — points Claude Code at the governance server
-- `.git/hooks/pre-commit` — validates staged resources before every commit
+- `.mcp.json` — MCP config for Claude Code, Cursor, Windsurf, and other MCP agents
+- `.github/copilot-instructions.md` — custom instructions for GitHub Copilot (REST API workflow)
+- `.git/hooks/pre-commit` — validates staged resources before every commit (model-agnostic)
 
-For the agent workflow, add a minimal `CLAUDE.md`:
+For MCP-compatible agents, add an instruction file (`CLAUDE.md`, `AGENTS.md`, `.cursorrules`, etc.) depending on your tool:
 
 ```markdown
 ## Governance
@@ -194,7 +212,7 @@ Before generating or modifying resources:
 4. validate_*                    ← self-validate before returning output
 ```
 
-Call `list_constitutions()` and `list_check_domains()` to discover what's available in the connected governance repo.
+For Copilot and other non-MCP tools, `.github/copilot-instructions.md` (generated above) contains the equivalent workflow using the REST API.
 
 ---
 

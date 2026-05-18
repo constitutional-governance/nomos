@@ -42,6 +42,37 @@ async def validate_sa(request: Request) -> JSONResponse:
     return JSONResponse(result.model_dump(), status_code=200 if result.valid else 422)
 
 
+async def validate_schema(request: Request) -> JSONResponse:
+    from src.server import _config
+    from src.validators import schema as v
+    body = await request.json()
+    result = v.validate_schema_entry(
+        body.get("format", ""),
+        body.get("compatibility_level", ""),
+        _config().kafka.schema_registry,
+    )
+    logger.info("REST validate_schema format=%s valid=%s", body.get("format"), result.valid)
+    return JSONResponse(result.model_dump(), status_code=200 if result.valid else 422)
+
+
+async def validate_rest_path(request: Request) -> JSONResponse:
+    from src.server import _config
+    from src.validators import rest_path as v
+    body = await request.json()
+    result = v.validate_rest_path(body.get("path", ""), _config().rest_api)
+    logger.info("REST validate_rest_path path=%s valid=%s", body.get("path"), result.valid)
+    return JSONResponse(result.model_dump(), status_code=200 if result.valid else 422)
+
+
+async def validate_service_name(request: Request) -> JSONResponse:
+    from src.server import _config
+    from src.validators import service_name as v
+    body = await request.json()
+    result = v.validate_service_name(body.get("name", ""), _config().service)
+    logger.info("REST validate_service_name name=%s valid=%s", body.get("name"), result.valid)
+    return JSONResponse(result.model_dump(), status_code=200 if result.valid else 422)
+
+
 async def github_webhook(request: Request) -> JSONResponse:
     import src.server as server_module
     loader = server_module._loader()
@@ -57,5 +88,8 @@ routes = [
     Route("/validate/topic", validate_topic, methods=["POST"]),
     Route("/validate/rbac", validate_rbac, methods=["POST"]),
     Route("/validate/sa", validate_sa, methods=["POST"]),
+    Route("/validate/schema", validate_schema, methods=["POST"]),
+    Route("/validate/rest-path", validate_rest_path, methods=["POST"]),
+    Route("/validate/service-name", validate_service_name, methods=["POST"]),
     Route("/webhook/github", github_webhook, methods=["POST"]),
 ]

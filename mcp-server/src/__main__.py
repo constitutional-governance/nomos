@@ -53,10 +53,17 @@ def _remote(server_url: str, args: list[str]) -> int:
         return 0
 
     command = args[0]
-    endpoint_map = {"topic": "/validate/topic", "rbac": "/validate/rbac", "sa": "/validate/sa"}
+    endpoint_map = {
+        "topic": "/validate/topic",
+        "rbac": "/validate/rbac",
+        "sa": "/validate/sa",
+        "schema": "/validate/schema",
+        "rest-path": "/validate/rest-path",
+        "service-name": "/validate/service-name",
+    }
 
     if command not in endpoint_map:
-        print(f"Unknown command '{command}'. Available: topic, rbac, sa")
+        print(f"Unknown command '{command}'. Available: topic, rbac, sa, schema, rest-path, service-name")
         return 1
 
     url = server_url + endpoint_map[command]
@@ -87,6 +94,30 @@ def _remote(server_url: str, args: list[str]) -> int:
         elif command == "sa":
             if len(args) < 2:
                 print("Usage: nomos-validate --server URL sa <name> [<name> ...]")
+                return 1
+            ok = True
+            for name in args[1:]:
+                r = httpx.post(url, json={"name": name}, timeout=10)
+                data = r.json()
+                if not _print_result(data.get("valid", False), data.get("errors", []), data.get("warnings", []), name):
+                    ok = False
+            return 0 if ok else 1
+
+        elif command == "rest-path":
+            if len(args) < 2:
+                print("Usage: nomos-validate --server URL rest-path <path> [<path> ...]")
+                return 1
+            ok = True
+            for path in args[1:]:
+                r = httpx.post(url, json={"path": path}, timeout=10)
+                data = r.json()
+                if not _print_result(data.get("valid", False), data.get("errors", []), data.get("warnings", []), path):
+                    ok = False
+            return 0 if ok else 1
+
+        elif command == "service-name":
+            if len(args) < 2:
+                print("Usage: nomos-validate --server URL service-name <name> [<name> ...]")
                 return 1
             ok = True
             for name in args[1:]:
@@ -155,7 +186,40 @@ def _local(args: list[str]) -> int:
         )
         return 0 if ok else 1
 
-    print(f"Unknown command '{command}'. Available: topic, rbac, sa")
+    if command == "schema":
+        from src.validators import schema as schema_validator
+        if len(args) < 3:
+            print("Usage: nomos-validate schema <format> <compatibility_level>")
+            return 1
+        r = schema_validator.validate_schema_entry(args[1], args[2], config.kafka.schema_registry)
+        label = f"{args[1]} / {args[2]}"
+        return 0 if _print_result(r.valid, r.errors, r.warnings, label) else 1
+
+    if command == "rest-path":
+        from src.validators import rest_path as rest_path_validator
+        if len(args) < 2:
+            print("Usage: nomos-validate rest-path <path> [<path> ...]")
+            return 1
+        ok = all(
+            _print_result(r.valid, r.errors, r.warnings, path)
+            for path in args[1:]
+            for r in [rest_path_validator.validate_rest_path(path, config.rest_api)]
+        )
+        return 0 if ok else 1
+
+    if command == "service-name":
+        from src.validators import service_name as service_name_validator
+        if len(args) < 2:
+            print("Usage: nomos-validate service-name <name> [<name> ...]")
+            return 1
+        ok = all(
+            _print_result(r.valid, r.errors, r.warnings, name)
+            for name in args[1:]
+            for r in [service_name_validator.validate_service_name(name, config.service)]
+        )
+        return 0 if ok else 1
+
+    print(f"Unknown command '{command}'. Available: topic, rbac, sa, schema, rest-path, service-name")
     return 1
 
 
