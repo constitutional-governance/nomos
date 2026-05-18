@@ -5,12 +5,12 @@ from src.loaders.base_loader import BaseLoader
 from src.models.adr import ADRContent, ADRSummary
 from src.models.config import GovernanceConfig
 from src.models.constitution import ConstitutionContent
-from src.models.convention import NamingConvention, KafkaConventions, CamelConventions, NamingType
+from src.models.convention import NamingConvention, KafkaConventions, CamelConventions, NamingType, RestApiConventions, ServiceConventions
 from src.models.check import Check
 from src.models.helm import HelmTemplate, HelmServiceType
 from src.models.validation import ValidationResult
-from src.tools import adr_tools, constitution_tools, convention_tools, check_tools, helm_tools
-from src.validators import topic as topic_validator, rbac as rbac_validator, sa_naming as sa_validator
+from src.tools import adr_tools, constitution_tools, convention_tools, check_tools, helm_tools, knowledge_tools
+from src.validators import topic as topic_validator, rbac as rbac_validator, sa_naming as sa_validator, schema as schema_validator, rest_path as rest_path_validator, service_name as service_name_validator
 
 logger = logging.getLogger(__name__)
 
@@ -144,6 +144,25 @@ def get_kafka_conventions() -> KafkaConventions:
 
 
 @mcp.tool(description=(
+    "Return REST API conventions: resource naming, URL path pattern, versioning strategy, "
+    "HTTP method semantics, and error format rules. "
+    "Call this before adding or modifying REST endpoints."
+))
+def get_rest_conventions() -> RestApiConventions:
+    logger.info("get_rest_conventions")
+    return convention_tools.get_rest_conventions(_config().rest_api)
+
+
+@mcp.tool(description=(
+    "Return microservice naming conventions: name pattern, max length, k8s constraints. "
+    "Call this before naming a new service, Helm release, or container image."
+))
+def get_service_conventions() -> ServiceConventions:
+    logger.info("get_service_conventions")
+    return convention_tools.get_service_conventions(_config().service)
+
+
+@mcp.tool(description=(
     "Return all Camel conventions: route ID naming, application name pattern, "
     "consumer group alignment, base class, and parent BOM. "
     "Call this before adding or modifying a Camel route."
@@ -224,4 +243,59 @@ def validate_rbac_binding(
 def validate_sa_name(name: str) -> ValidationResult:
     logger.info("validate_sa_name name=%s", name)
     return sa_validator.validate_sa_name(name, _config().kafka.service_account)
+
+
+@mcp.tool(description=(
+    "Validate a Schema Registry entry: format and compatibility_level. "
+    "format must be AVRO, JSON, or PROTOBUF. "
+    "compatibility_level must be one of the valid SR levels from governance.yml. "
+    "Use before adding or modifying any schemas.hcl entry."
+))
+def validate_schema_entry(format: str, compatibility_level: str) -> ValidationResult:
+    logger.info("validate_schema_entry format=%s compatibility_level=%s", format, compatibility_level)
+    return schema_validator.validate_schema_entry(format, compatibility_level, _config().kafka.schema_registry)
+
+
+@mcp.tool(description=(
+    "Validate a REST API path against the conventions in governance.yml. "
+    "Checks: starts with /, version prefix (/v1/), lowercase kebab-case segments, "
+    "no trailing slash, plural resource names. "
+    "Returns valid=true or a list of errors and warnings."
+))
+def validate_rest_path(path: str) -> ValidationResult:
+    logger.info("validate_rest_path path=%s", path)
+    return rest_path_validator.validate_rest_path(path, _config().rest_api)
+
+
+@mcp.tool(description=(
+    "Validate a microservice name against the conventions in governance.yml. "
+    "Checks: lowercase, kebab-case, no underscores, max 63 chars (k8s DNS label limit). "
+    "Returns valid=true or a list of errors and warnings."
+))
+def validate_service_name(name: str) -> ValidationResult:
+    logger.info("validate_service_name name=%s", name)
+    return service_name_validator.validate_service_name(name, _config().service)
+
+
+# ── Knowledge tools ────────────────────────────────────────────────────────────
+
+@mcp.tool(description=(
+    "List all available knowledge topics in this governance repo. "
+    "Call this to discover what AI failure patterns and lessons-learned are documented. "
+    "Then call get_knowledge() with a topic name to read the full content."
+))
+def list_knowledge() -> list[str]:
+    logger.info("list_knowledge")
+    return knowledge_tools.list_knowledge_topics(_loader())
+
+
+@mcp.tool(description=(
+    "Return the full content of a knowledge document (e.g. 'failures'). "
+    "Call list_knowledge() first to see what topics are available. "
+    "Always call get_knowledge('failures') before generating Kafka resources — "
+    "it documents systematic AI mistakes specific to this platform."
+))
+def get_knowledge(topic: str) -> str:
+    logger.info("get_knowledge topic=%s", topic)
+    return knowledge_tools.get_knowledge(_loader(), topic)
 

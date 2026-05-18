@@ -10,8 +10,7 @@ _KAFKA_CONSUMER = HelmTemplate(
 envVariables:
   - name: "LOGGING_LEVEL_ROOT"
     value: "WARN"
-  - name: "LOGGING_AVOLTA_LEVEL"
-    value: "INFO"
+  # - name: "LOGGING_<APP>_LEVEL"   # add org-specific log level var if needed
   - name: "AUTO_OFFSET_RESET"
     value: "latest"
   - name: "AUTO_REGISTER_SCHEMAS"
@@ -77,7 +76,7 @@ resources:
         "Replace all <CHANGE_ME> placeholders before committing.",
         "SASL_JAAS_CONFIG_USERNAME and SCHEMA_REGISTRY_AUTH_USER must match the Kafka2 service account name.",
         "Secret objectName in Key Vault must match the exact KV entry name (usually the SA name).",
-        "Add BOOTSTRAP_SERVERS only if the service does not use the in-cluster default (kafka-bootstrap.confluent.svc.cluster.local:9092).",
+        "Add BOOTSTRAP_SERVERS only if the service does not use the org-default bootstrap endpoint.",
     ],
 )
 
@@ -91,8 +90,7 @@ _KAFKA_PRODUCER = HelmTemplate(
 envVariables:
   - name: "LOGGING_LEVEL_ROOT"
     value: "WARN"
-  - name: "LOGGING_AVOLTA_LEVEL"
-    value: "INFO"
+  # - name: "LOGGING_<APP>_LEVEL"   # add org-specific log level var if needed
   - name: "AUTO_REGISTER_SCHEMAS"
     value: "false"
   - name: "USE_LATEST_VERSION"
@@ -169,8 +167,7 @@ _KAFKA_PROCESSOR = HelmTemplate(
 envVariables:
   - name: "LOGGING_LEVEL_ROOT"
     value: "WARN"
-  - name: "LOGGING_AVOLTA_LEVEL"
-    value: "INFO"
+  # - name: "LOGGING_<APP>_LEVEL"   # add org-specific log level var if needed
   - name: "AUTO_OFFSET_RESET"
     value: "latest"
   - name: "AUTO_REGISTER_SCHEMAS"
@@ -285,8 +282,7 @@ envVariables:
     value: "--add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.lang.reflect=ALL-UNNAMED"
   - name: "LOGGING_LEVEL_ROOT"
     value: "WARN"
-  - name: "LOGGING_AVOLTA_LEVEL_ROOT"
-    value: "INFO"
+  # - name: "LOGGING_<APP>_LEVEL_ROOT"  # add org-specific log level var if needed
   - name: "AUTO_OFFSET_RESET"
     value: "latest"
   - name: "AUTO_REGISTER_SCHEMAS"

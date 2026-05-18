@@ -1,7 +1,8 @@
 from src.models.convention import (
-    NamingConvention, KafkaConventions, CamelConventions, NamingType
+    NamingConvention, KafkaConventions, CamelConventions, NamingType,
+    RestApiConventions, ServiceConventions,
 )
-from src.models.config import CamelConfig, KafkaConfig
+from src.models.config import CamelConfig, KafkaConfig, RestApiConfig, ServiceConfig
 
 # ── Kafka ──────────────────────────────────────────────────────────────────────
 
@@ -185,4 +186,82 @@ def get_camel_conventions(camel_config: CamelConfig | None = None) -> CamelConve
         consumer_group=_KAFKA_CONSUMER_GROUP,
         base_class=config.base_class,
         parent_bom=config.parent_bom,
+    )
+
+
+# ── REST API ───────────────────────────────────────────────────────────────────
+
+_REST_RESOURCE = NamingConvention(
+    type="rest_resource",
+    pattern="/{version}/{resource}  |  /{version}/{resource}/{id}  |  /{version}/{resource}/{id}/{sub-resource}",
+    examples=[
+        "/v1/orders",
+        "/v1/orders/{orderId}",
+        "/v1/orders/{orderId}/items",
+        "/v1/customers/{customerId}/addresses",
+    ],
+    adr_ref="",
+    notes="Plural nouns. Kebab-case. Version prefix mandatory. No verbs in paths — use HTTP methods.",
+)
+
+_REST_METHOD_SEMANTICS: dict[str, str] = {
+    "GET": "Read — idempotent, no side effects, safe to retry",
+    "POST": "Create — not idempotent, generates a new resource",
+    "PUT": "Replace — idempotent, replaces the full resource",
+    "PATCH": "Update — partial modification, idempotent if designed correctly",
+    "DELETE": "Remove — idempotent (deleting a non-existent resource returns 404 or 204)",
+}
+
+_REST_NOTES = [
+    "Versioning is path-based (/v1/, /v2/) — not query parameter or Accept header.",
+    "Resource names are plural nouns — /orders not /order, /customers not /customer.",
+    "No verbs in paths — use the HTTP method to express the action.",
+    "Error responses use a structured body: { code, message, details }.",
+    "Pagination uses cursor or offset/limit query params — not path segments.",
+    "IDs in paths are opaque strings — do not expose internal database IDs as integers.",
+]
+
+
+def get_rest_conventions(config: RestApiConfig | None = None) -> RestApiConventions:
+    c = config or RestApiConfig()
+    return RestApiConventions(
+        resource_naming=_REST_RESOURCE,
+        path_pattern=f"/{c.version_prefix}{{n}}/{{resource}}[/{{id}}[/{{sub-resource}}]]",
+        versioning_strategy=c.versioning_strategy,
+        method_semantics=_REST_METHOD_SEMANTICS,
+        notes=_REST_NOTES,
+    )
+
+
+# ── Microservice ───────────────────────────────────────────────────────────────
+
+_SERVICE_NAME = NamingConvention(
+    type="microservice_name",
+    pattern="{domain}-{system}  |  {domain}-{system}-{role}",
+    examples=[
+        "retail-receipt-processor",
+        "sales-order-api",
+        "payments-gateway",
+        "retail-pos-acme-connector",
+    ],
+    adr_ref="",
+    notes="Lowercase kebab-case. Max 63 chars (k8s DNS label). No underscores.",
+)
+
+_SERVICE_NOTES = [
+    "Name is used as Helm release name, k8s Deployment name, and container image name — must be DNS-safe.",
+    "Max 63 characters — Kubernetes DNS label limit.",
+    "No underscores — use hyphens.",
+    "Follow {domain}-{system} at minimum; add -{role} suffix when multiple components share the same system.",
+    "Image tag follows the deploy tag convention: {service-path}@v{semver}.",
+]
+
+
+def get_service_conventions(config: ServiceConfig | None = None) -> ServiceConventions:
+    c = config or ServiceConfig()
+    return ServiceConventions(
+        service_name=_SERVICE_NAME,
+        name_pattern=c.name_pattern,
+        max_length=c.max_length,
+        notes=_SERVICE_NOTES,
     )

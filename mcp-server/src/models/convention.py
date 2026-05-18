@@ -13,6 +13,8 @@ NamingType = Literal[
     "schema_subject",
     "helm_release",
     "deploy_tag",
+    "rest_resource",
+    "microservice_name",
 ]
 
 
@@ -42,3 +44,18 @@ class CamelConventions(BaseModel):
     consumer_group: NamingConvention
     base_class: str
     parent_bom: str
+
+
+class RestApiConventions(BaseModel):
+    resource_naming: NamingConvention
+    path_pattern: str
+    versioning_strategy: str
+    method_semantics: dict[str, str]
+    notes: list[str]
+
+
+class ServiceConventions(BaseModel):
+    service_name: NamingConvention
+    name_pattern: str
+    max_length: int
+    notes: list[str]
