@@ -16,52 +16,52 @@ Feature: Service account naming convention
 
   @enforced
   Scenario: Valid JDBC source connector SA passes
-    Given a service account named "sa-sales-lsretail-lookup-connector-source-jdbc-dev"
+    Given a service account named "sa-payments-connector-source-jdbc-dev"
     When I validate it
     Then validation passes
 
   @enforced
   Scenario: Valid sink connector SA passes
-    Given a service account named "sa-sales-pos-hmsu-connector-sink-jdbc-prod"
+    Given a service account named "sa-payments-connector-sink-jdbc-prod"
     When I validate it
     Then validation passes
 
   @enforced
   Scenario: Valid debug SA passes
-    Given a service account named "sa-sales-hmsu-dev-debug"
+    Given a service account named "sa-retail-acme-dev-debug"
     When I validate it
     Then validation passes
 
   @enforced
   Scenario: Valid standard SA passes
-    Given a service account named "sa-sales-pos-hmsu-dev"
+    Given a service account named "sa-retail-acme-dev"
     When I validate it
     Then validation passes
 
   @enforced
   Scenario: Missing sa- prefix is rejected
-    Given a service account named "sales-lsretail-lookup-dev"
+    Given a service account named "payments-connector-source-jdbc-dev"
     When I validate it
     Then validation fails
     And the error contains "sa-"
 
   @enforced
   Scenario: Invalid environment suffix is rejected
-    Given a service account named "sa-sales-lsretail-lookup-connector-source-jdbc-staging"
+    Given a service account named "sa-payments-connector-source-jdbc-staging"
     When I validate it
     Then validation fails
     And the error contains "environment"
 
   @enforced
   Scenario: Unknown connector direction is rejected
-    Given a service account named "sa-sales-lsretail-lookup-connector-push-jdbc-dev"
+    Given a service account named "sa-payments-connector-push-jdbc-dev"
     When I validate it
     Then validation fails
     And the error contains "source"
 
   @enforced
   Scenario: Uppercase letters are rejected
-    Given a service account named "sa-Sales-lsretail-dev"
+    Given a service account named "sa-Payments-connector-source-jdbc-dev"
     When I validate it
     Then validation fails
     And the error contains "lowercase"

@@ -66,32 +66,60 @@ nomos --github https://github.com/your-org/governance-repo   # GitHub mode
 nomos-validate topic raw.payments.pos.checkout.receipts.transaction.v1
 nomos-validate rbac DeveloperRead topic "raw.payments.*"
 nomos-validate sa sa-payments-connector-source-jdbc-prod
+nomos-validate schema AVRO BACKWARD
 
 # Validate resources (remote mode — delegates to shared server)
 nomos-validate --server https://governance.acme.com topic raw.payments...
+nomos-validate --server https://governance.acme.com schema AVRO BACKWARD_TRANSITIVE
+
+# Install .mcp.json + pre-commit hook in a project repo
+nomos install-hooks --server https://governance.acme.com --project-dir /path/to/repo
 ```
 
 ---
 
 ## MCP tools
 
+### Discovery and conventions
+
 | Tool | Purpose |
 |---|---|
 | `list_constitutions()` | Discover governed domains |
 | `list_check_domains()` | Discover domains with executable checks |
+| `list_knowledge()` | Discover available knowledge topics (failures, lessons learned) |
 | `get_active_rules()` | Full governance.yml as structured object |
-| `get_constitution(domain)` | Domain principles |
-| `get_kafka_conventions()` | Topic naming, RBAC, schema subjects, consumer groups |
+| `get_constitution(domain)` | Domain principles — `"global"`, `"kafka"`, etc. |
+| `get_kafka_conventions()` | Topic naming, RBAC, schema subjects, consumer groups, prefix semantics |
 | `get_camel_conventions()` | Route IDs, application names, base class, BOM |
 | `get_naming_conventions(type)` | Pattern + examples for one resource type |
+| `get_knowledge(topic)` | Knowledge documents — call `get_knowledge("failures")` before generating resources |
+
+### ADRs and checks
+
+| Tool | Purpose |
+|---|---|
 | `get_adr(id)` | Full ADR content |
 | `search_adrs(query)` | Full-text search across ADRs |
 | `list_adrs()` | All governance decisions |
 | `get_checks(domain)` | Gherkin checks for a domain |
 | `get_helm_template(service_type)` | Helm values template |
-| `validate_topic_name(name)` | Validate against governance.yml |
+
+### Validation
+
+| Tool | Purpose |
+|---|---|
+| `validate_topic_name(name)` | Validate topic name against governance.yml |
 | `validate_rbac_binding(role, type, name)` | Validate an RBAC binding |
 | `validate_sa_name(name)` | Validate a service account name |
+| `validate_schema_entry(format, compatibility_level)` | Validate a Schema Registry entry |
+
+### Recommended agent workflow
+
+Before generating any resource:
+1. Call `get_knowledge("failures")` — reads platform-specific AI failure patterns
+2. Call `get_kafka_conventions()` or `get_constitution("kafka")` — loads current rules
+3. Generate the resource
+4. Call the relevant `validate_*` tool — self-validate before proposing
 
 ## REST endpoints
 
@@ -101,6 +129,7 @@ nomos-validate --server https://governance.acme.com topic raw.payments...
 | `/validate/topic` | POST | `{"name": "..."}` |
 | `/validate/rbac` | POST | `{"role_name": "...", "resource_type": "...", "resource_name": "..."}` |
 | `/validate/sa` | POST | `{"name": "..."}` |
+| `/validate/schema` | POST | `{"format": "AVRO", "compatibility_level": "BACKWARD"}` |
 | `/webhook/github` | POST | Invalidates cache on push |
 
 ---
@@ -123,10 +152,13 @@ Nomos expects this layout in the governance repo:
 
 ```
 governance-repo/
-├── governance.yml          ← drives all validators
+├── governance.yml          ← drives all validators (prefixes, roles, SA envs, schema formats)
 ├── constitution.md         ← global principles
 ├── constitutions/
-│   └── <domain>.md         ← per-domain principles
+│   └── <domain>.md         ← per-domain principles (kafka, camel, springboot, …)
+├── knowledge/
+│   ├── failures.md         ← systematic AI failure patterns for this platform
+│   └── successful.md       ← patterns and approaches that have worked well
 ├── adrs/
 │   └── global/
 │       └── NNN-title.md    ← Architecture Decision Records

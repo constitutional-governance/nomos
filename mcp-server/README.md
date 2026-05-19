@@ -1,6 +1,6 @@
 # nomos
 
-> Constitutional Governance server — exposes ADRs, constitutions, naming conventions, and executable compliance checks via MCP, REST, and CLI.
+> Constitutional Governance server — serves platform rules to AI agents via MCP and CLI.
 
 Part of the [Constitutional Governance](https://github.com/constitutional-governance/constitutional-governance) methodology.
 
@@ -29,15 +29,41 @@ Use [nomos-template](https://github.com/constitutional-governance/nomos-template
 
 ---
 
-## What it exposes
+## Integration paths
 
-### MCP tools (Claude Code, Cursor, Windsurf, and any MCP-compatible agent)
+Nomos exposes governance rules through two interfaces. Choose based on your tooling:
 
-Connect via `http://your-server/mcp`. Configure with `nomos install-hooks --tool mcp`.
+| Interface | When to use | How to configure |
+|---|---|---|
+| **MCP** | Interactive AI agents — Claude Code, Copilot, Cursor, Windsurf | `nomos install-hooks` |
+| **CLI** | Pre-commit hooks, CI pipelines, scripts, agents without MCP | `pip install nomos` |
+
+Both interfaces read the same governance rules from the same server. The CLI can run in local mode (no server needed) or remote mode (delegates to a shared server).
+
+---
+
+## MCP interface
+
+For AI agents that support the Model Context Protocol.
+
+### Setup
+
+```bash
+# Generates .mcp.json (Claude Code) + .vscode/mcp.json (VS Code / Copilot)
+nomos install-hooks --server https://governance.your-org.com
+
+# Claude Code only
+nomos install-hooks --server https://governance.your-org.com --tool claude
+
+# VS Code / GitHub Copilot only
+nomos install-hooks --server https://governance.your-org.com --tool vscode
+```
+
+### Available tools
 
 ```
 # Discovery
-list_constitutions()              → ["global", "kafka", "camel", "springboot"]
+list_constitutions()              → ["global", "kafka", "rest-api", ...]
 list_check_domains()              → ["kafka", "springboot", ...]
 list_knowledge()                  → ["failures", "successful"]
 
@@ -45,6 +71,8 @@ list_knowledge()                  → ["failures", "successful"]
 get_active_rules()                → full governance.yml as structured object
 get_constitution("kafka")         → domain principles and invariants
 get_kafka_conventions()           → prefixes, roles, patterns, prefix semantics
+get_rest_conventions()            → URL patterns, method semantics, versioning rules
+get_service_conventions()         → service naming, k8s constraints
 get_knowledge("failures")         → platform-specific AI failure patterns
 
 # ADRs
@@ -55,7 +83,7 @@ search_adrs("consumer group")     → ADRs matching the query
 # Checks
 get_checks("kafka")               → [{title, status, content}, ...]
 
-# Validation — call these after generating resources, before proposing
+# Validation
 validate_topic_name("...")        → {valid, errors, warnings}
 validate_rbac_binding(...)        → {valid, errors}
 validate_sa_name("...")           → {valid, errors}
@@ -64,15 +92,73 @@ validate_rest_path("/v1/orders")  → {valid, errors, warnings}
 validate_service_name("...")      → {valid, errors, warnings}
 ```
 
-**Recommended workflow for agents:** call `get_knowledge("failures")` first, then generate, then validate.
+**Recommended agent workflow:** call `get_knowledge("failures")` first, then generate, then validate.
 
-### GitHub Copilot in VS Code
+---
 
-Copilot supports MCP via `.vscode/mcp.json`. Same protocol, different config file location.
+## CLI interface
 
-Configure with `nomos install-hooks --tool vscode`.
+For pre-commit hooks, CI pipelines, and any tool that can run a shell command.
 
-### REST endpoints (for CI and scripts)
+### Validate resources
+
+```bash
+# Local mode — reads governance.yml from GOVERNANCE_REPO_PATH
+nomos-validate topic "raw.payments.pos.checkout.receipts.transaction.v1"
+nomos-validate rbac DeveloperRead topic "raw.payments.*"
+nomos-validate sa "sa-payments-connector-source-jdbc-prod"
+nomos-validate schema AVRO BACKWARD
+nomos-validate rest-path "/v1/orders/{orderId}/items"
+nomos-validate service-name "retail-order-api"
+
+# Remote mode — delegates to a shared server, no local files needed
+nomos-validate --server https://governance.your-org.com topic "raw.payments.pos.checkout.receipts.transaction.v1"
+nomos-validate --server https://governance.your-org.com rbac DeveloperRead topic "raw.payments.*"
+nomos-validate --server https://governance.your-org.com rest-path "/v1/orders"
+nomos-validate --server https://governance.your-org.com service-name "retail-order-api"
+```
+
+Exit code `0` = valid. Exit code `1` = invalid — read the output and fix before committing.
+
+### Example output
+
+```
+OK  raw.payments.pos.checkout.receipts.transaction.v1
+
+ERR raw.payments.pos.checkout.v1
+    expected 7 dot-separated segments, got 5
+
+OK  /v1/orders/{orderId}/items
+
+ERR /v1/CustomerOrders
+    path must be lowercase — use kebab-case for all static segments
+```
+
+### Pre-commit hook
+
+`nomos install-hooks` installs a pre-commit hook that validates staged files automatically:
+
+```bash
+nomos install-hooks --server https://governance.your-org.com
+```
+
+The hook runs `nomos-validate` on every commit — no MCP, no server connection needed for local validation.
+
+### Governance tooling
+
+```bash
+# Scaffold a new domain (constitution + ADR + Gherkin template)
+nomos scaffold domain rest-api
+
+# Verify a @wip scenario is ready to promote to @enforced
+nomos check-promotion features/kafka/topic-naming.feature --run
+```
+
+---
+
+## REST endpoints
+
+For CI pipelines and scripts that prefer HTTP over CLI:
 
 ```
 GET  /health
@@ -85,67 +171,25 @@ POST /validate/service-name {"name": "retail-order-api"}
 POST /webhook/github        (GitHub push webhook — invalidates cache)
 ```
 
-### CLI commands
-
-**Validate resources** (local or against a shared server):
-
-```bash
-nomos-validate topic "raw.payments.pos.checkout.receipts.transaction.v1"
-nomos-validate rbac DeveloperRead topic "raw.payments.*"
-nomos-validate sa "sa-payments-connector-source-jdbc-prod"
-nomos-validate schema AVRO BACKWARD
-nomos-validate rest-path "/v1/orders/{orderId}/items"
-nomos-validate service-name "retail-order-api"
-
-# Against a shared server (no local files needed — works from any tool)
-nomos-validate --server https://governance.acme.com topic "raw.payments.pos.checkout.receipts.transaction.v1"
-nomos-validate --server https://governance.acme.com rest-path "/v1/orders"
-nomos-validate --server https://governance.acme.com service-name "retail-order-api"
-```
-
-**Governance tooling**:
-
-```bash
-# Install config for all tools + pre-commit hook
-nomos install-hooks --server https://governance.acme.com
-
-# Claude Code only (.mcp.json)
-nomos install-hooks --server https://governance.acme.com --tool claude
-
-# VS Code / GitHub Copilot only (.vscode/mcp.json)
-nomos install-hooks --server https://governance.acme.com --tool vscode
-
-# Scaffold a new domain (constitution + ADR + Gherkin template)
-nomos scaffold domain kafka
-
-# Verify a @wip scenario is ready to promote to @enforced
-nomos check-promotion features/kafka/topic-naming.feature --run
-```
-
 ---
 
 ## Usage examples
 
-### 1. Kafka / Terraform repo (infrastructure team)
+### 1. Kafka / Terraform repo
 
-Add to your repo's `CLAUDE.md`:
+Add to your agent instruction file (`CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`):
 
 ```markdown
 ## Before generating any HCL
 
-**Step 1 — Load rules (call once per task):**
-get_knowledge("failures")      ← read platform AI failure patterns first
-get_kafka_conventions()        ← topic naming, RBAC roles, prefix semantics
-get_constitution("kafka")      ← invariants, connector RBAC patterns, SA rules
-
-**Step 2 — Self-validate before proposing:**
-validate_topic_name(name)                        ← for every topic key
-validate_rbac_binding(role, resource_type, name) ← for every role binding
-validate_sa_name(name)                           ← for every service account
-validate_schema_entry(format, compatibility)     ← for every schema entry
+1. get_knowledge("failures")      ← read platform AI failure patterns first
+2. get_kafka_conventions()        ← topic naming, RBAC roles, prefix semantics
+3. get_constitution("kafka")      ← invariants, connector RBAC patterns, SA rules
+4. [generate]
+5. validate_topic_name / validate_rbac_binding / validate_sa_name / validate_schema_entry
 ```
 
-Wire up the pre-commit hook so humans are also covered:
+Install the pre-commit hook so humans are covered too:
 
 ```bash
 nomos install-hooks --server https://governance.your-org.com
@@ -153,86 +197,39 @@ nomos install-hooks --server https://governance.your-org.com
 
 ### 2. REST API service repo
 
-**MCP agents** (Claude Code, Cursor, ...) — add to your instruction file (`CLAUDE.md`, `AGENTS.md`, etc.):
-
 ```markdown
 ## Before adding or modifying REST endpoints
 
-get_knowledge("failures")      ← read platform AI failure patterns first
-get_rest_conventions()         ← URL patterns, method semantics, versioning rules
-get_constitution("rest-api")   ← error format, pagination, ID conventions
-
-validate_rest_path(path)       ← for every new endpoint path
-validate_service_name(name)    ← when naming a new service or Helm release
+1. get_knowledge("failures")
+2. get_rest_conventions()
+3. get_constitution("rest-api")
+4. [generate]
+5. validate_rest_path / validate_service_name
 ```
 
-**Copilot and other tools** — use the CLI from the terminal:
-
-```bash
-nomos-validate --server https://governance.your-org.com rest-path "/v1/customer-orders/{orderId}/line-items"
-nomos-validate --server https://governance.your-org.com service-name "retail-order-api"
-```
-
-Example validation output:
-
-```
-ERR /v1/CustomerOrders
-    path must be lowercase — use kebab-case for all static segments
-
-OK  /v1/customer-orders/{orderId}/line-items
-```
-
-### 3. Onboarding a new service repo
-
-One command configures all supported AI tools:
+### 3. Onboarding a new repo
 
 ```bash
 cd /path/to/your-service-repo
 nomos install-hooks --server https://governance.your-org.com
 ```
 
-This creates:
-- `.mcp.json` — MCP config for Claude Code
-- `.vscode/mcp.json` — MCP config for VS Code / GitHub Copilot
-- `.git/hooks/pre-commit` — validates staged resources before every commit (model-agnostic)
-
-Both config files point at the same server and expose the same MCP tools. Add an agent instruction file appropriate for your tool:
-
-| Tool | Instruction file |
-|---|---|
-| Claude Code | `CLAUDE.md` |
-| GitHub Copilot / VS Code | `.github/copilot-instructions.md` |
-| Cursor | `.cursorrules` or `.cursor/rules/*.md` |
-| Generic (Codex, etc.) | `AGENTS.md` |
-
-Minimal instruction file content (same for all tools):
-
-```markdown
-## Governance
-
-Connected to the platform governance server (see .mcp.json / .vscode/mcp.json).
-
-Before generating or modifying resources:
-1. get_knowledge("failures")     ← always call this first
-2. get_constitution("global")    ← platform-wide principles
-3. get_constitution("<domain>")  ← domain-specific rules (kafka, rest-api, ...)
-4. validate_*                    ← self-validate before returning output
-```
+Generates:
+- `.mcp.json` — Claude Code
+- `.vscode/mcp.json` — VS Code / GitHub Copilot
+- `.git/hooks/pre-commit` — CLI validation on every commit
 
 ---
 
 ## Deployment
 
-The platform team deploys **one** shared instance. Every team delegates to it — nobody runs their own copy.
+The platform team deploys **one** shared instance. Every repo delegates to it.
 
 ```bash
-# Docker (recommended for production)
 export GOVERNANCE_REPO_URL=https://github.com/constitutional-governance/nomos-template
 export GITHUB_TOKEN=ghp_...
 docker compose up -d
 ```
-
-Full deployment guide: [nomos-template/DEPLOYMENT.md](https://github.com/constitutional-governance/nomos-template/blob/main/DEPLOYMENT.md)
 
 ---
 
@@ -240,7 +237,7 @@ Full deployment guide: [nomos-template/DEPLOYMENT.md](https://github.com/constit
 
 ```
 nomos --repo PATH          Load governance repo from local path
-nomos --github URL         Load governance repo from GitHub (requires GITHUB_TOKEN for private repos)
+nomos --github URL         Load governance repo from GitHub
 nomos --host HOST          Bind host (default: 127.0.0.1; use 0.0.0.0 in Docker)
 nomos --port PORT          Listen port (default: 8080)
 ```

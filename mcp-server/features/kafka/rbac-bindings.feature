@@ -13,13 +13,13 @@ Feature: RBAC role binding constraints
 
   @enforced
   Scenario: DeveloperRead on a topic is valid
-    Given a role binding with role "DeveloperRead" on resource_type "topic" and resource_name "raw.sales.*"
+    Given a role binding with role "DeveloperRead" on resource_type "topic" and resource_name "raw.retail.*"
     When I validate it
     Then validation passes
 
   @enforced
   Scenario: ResourceOwner on a consumer group is valid
-    Given a role binding with role "ResourceOwner" on resource_type "group" and resource_name "kstreams.sales.*"
+    Given a role binding with role "ResourceOwner" on resource_type "group" and resource_name "kstreams.retail.*"
     When I validate it
     Then validation passes
 
@@ -31,14 +31,14 @@ Feature: RBAC role binding constraints
 
   @enforced
   Scenario: DeveloperManage on a topic is rejected — would grant topic delete rights
-    Given a role binding with role "DeveloperManage" on resource_type "topic" and resource_name "raw.sales.*"
+    Given a role binding with role "DeveloperManage" on resource_type "topic" and resource_name "raw.retail.*"
     When I validate it
     Then validation fails
     And the error contains "DeveloperManage is only valid on resource_type 'cluster'"
 
   @enforced
   Scenario: DeveloperManage on a consumer group is rejected
-    Given a role binding with role "DeveloperManage" on resource_type "group" and resource_name "kstreams.sales.*"
+    Given a role binding with role "DeveloperManage" on resource_type "group" and resource_name "kstreams.retail.*"
     When I validate it
     Then validation fails
     And the error contains "DeveloperManage is only valid on resource_type 'cluster'"
@@ -52,14 +52,14 @@ Feature: RBAC role binding constraints
 
   @enforced
   Scenario: Unknown role name is rejected
-    Given a role binding with role "SuperAdmin" on resource_type "topic" and resource_name "raw.sales.*"
+    Given a role binding with role "SuperAdmin" on resource_type "topic" and resource_name "raw.retail.*"
     When I validate it
     Then validation fails
     And the error contains "invalid role_name"
 
   @enforced
   Scenario: Unknown resource type is rejected
-    Given a role binding with role "DeveloperRead" on resource_type "queue" and resource_name "raw.sales.*"
+    Given a role binding with role "DeveloperRead" on resource_type "queue" and resource_name "raw.retail.*"
     When I validate it
     Then validation fails
     And the error contains "invalid resource_type"

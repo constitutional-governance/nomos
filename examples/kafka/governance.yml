@@ -40,6 +40,7 @@ kafka:
       - group
       - transactional-id
       - cluster
+      - subject
     # Roles that may only be granted on admin_resource_types
     admin_roles:
       - DeveloperManage
@@ -62,6 +63,22 @@ kafka:
       - sink
     # Debug SA ends with this suffix
     debug_suffix: "debug"
+
+  schema_registry:
+    valid_formats:
+      - AVRO
+      - JSON
+      - PROTOBUF
+    valid_compatibility_levels:
+      - BACKWARD
+      - BACKWARD_TRANSITIVE
+      - FORWARD
+      - FORWARD_TRANSITIVE
+      - FULL
+      - FULL_TRANSITIVE
+      - NONE
+    default_format: AVRO
+    default_compatibility_level: BACKWARD
 
 # ── Camel domain ───────────────────────────────────────────────────────────────
 camel:
