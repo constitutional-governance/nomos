@@ -2,7 +2,7 @@
 
 > Constitutional Governance server — exposes ADRs, constitutions, naming conventions, and executable compliance checks via MCP, REST, and CLI.
 
-Part of the [Constitutional Governance](https://github.com/your-org/constitutional-governance) methodology.
+Part of the [Constitutional Governance](https://github.com/constitutional-governance/constitutional-governance) methodology.
 
 ---
 
@@ -22,10 +22,10 @@ nomos --repo /path/to/your-governance-repo
 # → listening on http://127.0.0.1:8080
 
 # Or load from GitHub directly
-nomos --github https://github.com/your-org/your-governance-repo
+nomos --github https://github.com/constitutional-governance/nomos-template
 ```
 
-Use [nomos-template](https://github.com/your-org/nomos-template) as your governance repo starting point.
+Use [nomos-template](https://github.com/constitutional-governance/nomos-template) as your governance repo starting point.
 
 ---
 
@@ -227,12 +227,12 @@ The platform team deploys **one** shared instance. Every team delegates to it �
 
 ```bash
 # Docker (recommended for production)
-export GOVERNANCE_REPO_URL=https://github.com/your-org/your-governance-repo
+export GOVERNANCE_REPO_URL=https://github.com/constitutional-governance/nomos-template
 export GITHUB_TOKEN=ghp_...
 docker compose up -d
 ```
 
-Full deployment guide: [nomos-template/DEPLOYMENT.md](https://github.com/your-org/nomos-template/blob/main/DEPLOYMENT.md)
+Full deployment guide: [nomos-template/DEPLOYMENT.md](https://github.com/constitutional-governance/nomos-template/blob/main/DEPLOYMENT.md)
 
 ---
 
@@ -251,4 +251,4 @@ Environment variables: `GOVERNANCE_REPO_PATH`, `GOVERNANCE_REPO_URL`, `GITHUB_TO
 
 ## Contributing
 
-→ [CONTRIBUTING.md](https://github.com/your-org/constitutional-governance/blob/main/.github/CONTRIBUTING.md)
+→ [CONTRIBUTING.md](https://github.com/constitutional-governance/constitutional-governance/blob/main/.github/CONTRIBUTING.md)

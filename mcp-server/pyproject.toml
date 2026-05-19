@@ -33,10 +33,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/your-org/nomos"
-Documentation = "https://github.com/your-org/constitutional-governance"
-Repository = "https://github.com/your-org/nomos"
-"Bug Tracker" = "https://github.com/your-org/nomos/issues"
+Homepage = "https://github.com/constitutional-governance/nomos"
+Documentation = "https://github.com/constitutional-governance/constitutional-governance"
+Repository = "https://github.com/constitutional-governance/nomos"
+"Bug Tracker" = "https://github.com/constitutional-governance/nomos/issues"
 
 [project.optional-dependencies]
 dev = [
