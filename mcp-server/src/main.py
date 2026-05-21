@@ -68,10 +68,11 @@ def main() -> None:
     from starlette.applications import Starlette
     from starlette.routing import Mount
     from src.routes.validate import routes as rest_routes
+    from src.routes.copilot import routes as copilot_routes
     from src.middleware import TeamContextMiddleware
 
     mcp_app = mcp.streamable_http_app()
-    base_app = Starlette(routes=[*rest_routes, Mount("/", mcp_app)])
+    base_app = Starlette(routes=[*rest_routes, *copilot_routes, Mount("/", mcp_app)])
     app = TeamContextMiddleware(base_app)
 
     logging.getLogger(__name__).info(

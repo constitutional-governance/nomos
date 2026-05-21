@@ -156,6 +156,31 @@ nomos check-promotion features/kafka/topic-naming.feature --run
 
 ---
 
+## GitHub Copilot Extension
+
+Exposes Nomos as a `@nomos` agent in any Copilot-enabled client (VS Code, GitHub.com, mobile).
+
+```
+@nomos validate topic raw.payments.pos.checkout.receipts.transaction.v1
+@nomos validate rbac DeveloperRead topic "raw.payments.*"
+@nomos get kafka conventions
+@nomos get constitution kafka
+@nomos list adrs
+@nomos get adr 001
+@nomos search adrs consumer group
+```
+
+### Setup
+
+1. Create a GitHub App at **github.com/settings/apps/new**
+2. Under **Copilot Extension**, set the agent URL to `https://governance.your-org.com/copilot/agent`
+3. Install the app in your organisation
+4. Developers can invoke `@nomos` in any Copilot chat
+
+No separate deployment needed — the same Nomos server that serves MCP also handles Copilot Extension requests at `POST /copilot/agent`.
+
+---
+
 ## REST endpoints
 
 For CI pipelines and scripts that prefer HTTP over CLI:
@@ -169,6 +194,7 @@ POST /validate/schema       {"format": "AVRO", "compatibility_level": "BACKWARD"
 POST /validate/rest-path    {"path": "/v1/orders/{orderId}/items"}
 POST /validate/service-name {"name": "retail-order-api"}
 POST /webhook/github        (GitHub push webhook — invalidates cache)
+POST /copilot/agent         (GitHub Copilot Extension — SSE agent protocol)
 ```
 
 ---
