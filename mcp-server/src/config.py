@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     mcp_server_host: str = "127.0.0.1"  # use 0.0.0.0 in Docker/production
     mcp_server_port: int = 8080
     log_level: str = "INFO"
+    allowed_hosts: str = ""  # comma-separated, e.g. "nomos-f3vy.onrender.com,localhost"
 
     class Config:
         env_file = ".env"

@@ -14,7 +14,14 @@ from src.validators import topic as topic_validator, rbac as rbac_validator, sa_
 
 logger = logging.getLogger(__name__)
 
-mcp = FastMCP("nomos")
+def _transport_security():
+    from mcp.server.transport_security import TransportSecuritySettings
+    hosts = [h.strip() for h in settings.allowed_hosts.split(",") if h.strip()]
+    if not hosts:
+        return TransportSecuritySettings(enable_dns_rebinding_protection=False)
+    return TransportSecuritySettings(allowed_hosts=hosts)
+
+mcp = FastMCP("nomos", transport_security=_transport_security())
 
 _governance_config: GovernanceConfig | None = None
 
