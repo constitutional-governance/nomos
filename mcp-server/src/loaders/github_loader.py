@@ -11,7 +11,9 @@ class GitHubLoader(BaseLoader):
         self._owner = parts[-2]
         self._repo = parts[-1]
         self._branch = branch
-        self._headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github.v3+json"}
+        self._headers = {"Accept": "application/vnd.github.v3+json"}
+        if token:
+            self._headers["Authorization"] = f"Bearer {token}"
         self._ttl = ttl
         self._cache: dict[str, tuple[str, float]] = {}
 
