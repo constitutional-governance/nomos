@@ -5,7 +5,7 @@ WORKDIR /app
 COPY pyproject.toml ./
 COPY src/ ./src/
 
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir hatchling && pip install --no-cache-dir .
 
 # For local mode: mount your governance repo at /governance
 # For github mode: set GOVERNANCE_REPO_URL and GITHUB_TOKEN
