@@ -63,6 +63,7 @@ def main() -> None:
         settings.governance_repo_url = args.github
         settings.governance_mode = "github"
 
+    from contextlib import asynccontextmanager
     from src.server import mcp
     import uvicorn
     from starlette.applications import Starlette
@@ -72,7 +73,13 @@ def main() -> None:
     from src.middleware import TeamContextMiddleware
 
     mcp_app = mcp.streamable_http_app()
-    base_app = Starlette(routes=[*rest_routes, *copilot_routes, Mount("/", mcp_app)])
+
+    @asynccontextmanager
+    async def lifespan(app):
+        async with mcp_app.router.lifespan_context(app):
+            yield
+
+    base_app = Starlette(routes=[*rest_routes, *copilot_routes, Mount("/", mcp_app)], lifespan=lifespan)
     app = TeamContextMiddleware(base_app)
 
     logging.getLogger(__name__).info(
