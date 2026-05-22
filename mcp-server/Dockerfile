@@ -5,7 +5,16 @@ WORKDIR /app
 COPY pyproject.toml ./
 COPY src/ ./src/
 
-RUN pip install --no-cache-dir hatchling && pip install --no-cache-dir .
+RUN pip install --no-cache-dir \
+    "mcp[cli]>=1.6.0" \
+    "fastapi>=0.115.0" \
+    "uvicorn[standard]>=0.30.0" \
+    "pydantic>=2.0.0" \
+    "httpx>=0.27.0" \
+    "pydantic-settings>=2.0.0" \
+    "pyyaml>=6.0"
+
+ENV PYTHONPATH=/app
 
 # For local mode: mount your governance repo at /governance
 # For github mode: set GOVERNANCE_REPO_URL and GITHUB_TOKEN
@@ -21,4 +30,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"
 
-CMD ["nomos"]
+CMD ["python", "-m", "src.main"]
