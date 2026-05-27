@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     mcp_server_port: int = 8080
     log_level: str = "INFO"
     allowed_hosts: str = ""  # comma-separated, e.g. "nomos-f3vy.onrender.com,localhost"
+    on_unavailable: str = "fail"  # "fail" (default, fail-closed) | "warn" (fail-open, advisory workflows)
 
     class Config:
         env_file = ".env"
