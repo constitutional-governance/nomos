@@ -131,6 +131,69 @@ Before generating any resource:
 | `/validate/sa` | POST | `{"name": "..."}` |
 | `/validate/schema` | POST | `{"format": "AVRO", "compatibility_level": "BACKWARD"}` |
 | `/webhook/github` | POST | Invalidates cache on push |
+| `/webhook/incident` | POST | Report a violation → opens a PR against the governance repo |
+
+---
+
+## Webhooks
+
+### `POST /webhook/incident` — Incident-to-Eval Synthesis
+
+When a governance violation reaches production (caught by CI, a pre-commit hook, or a manual report), call this endpoint to automatically synthesise it into a new entry in `knowledge/failures.md` in the governance repo. The entry is submitted as a pull request so it can be reviewed before becoming visible to agents.
+
+**Required environment variables:**
+
+| Variable | Purpose |
+|---|---|
+| `GITHUB_TOKEN` | Personal access token with `repo` scope. **Endpoint returns 503 if absent (fail-closed).** |
+| `NOMOS_REPO_PATH` | `{owner}/{repo}` of the governance repo, e.g. `my-org/governance`. Falls back to `GOVERNANCE_REPO_URL` in GitHub mode. |
+
+**Request body:**
+
+```json
+{
+  "resource_name":   "raw.payments.checkout.v1",
+  "resource_type":   "kafka_topic",
+  "rule_violated":   "Topic must have exactly 7 dot-separated segments",
+  "bad_pattern":     "raw.payments.checkout.v1",
+  "correct_pattern": "raw.payments.pos.acme.checkout.receipt.v1"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "queued": true,
+  "pr_url": "https://github.com/my-org/governance/pull/7",
+  "entry_preview": "\n## Topic must have exactly 7 ...\n\n- **Resource:** ..."
+}
+```
+
+**Error responses:**
+
+| Status | Cause |
+|---|---|
+| 400 | Missing or malformed fields in the request body |
+| 503 | `GITHUB_TOKEN` or `NOMOS_REPO_PATH` not configured |
+| 502 | GitHub API unreachable or returned an error |
+
+**Example — report from a GitHub Actions CI failure:**
+
+```yaml
+- name: Report governance violation
+  if: failure()
+  run: |
+    curl -sX POST https://nomos.acme.com/webhook/incident \
+      -H "Content-Type: application/json" \
+      -d '{
+        "resource_name":   "${{ env.RESOURCE_NAME }}",
+        "resource_type":   "${{ env.RESOURCE_TYPE }}",
+        "rule_violated":   "${{ env.RULE_VIOLATED }}",
+        "bad_pattern":     "${{ env.BAD_PATTERN }}",
+        "correct_pattern": "${{ env.CORRECT_PATTERN }}"
+      }'
+```
 
 ---
 
