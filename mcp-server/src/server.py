@@ -49,8 +49,26 @@ def _loader() -> BaseLoader:
 def _config() -> GovernanceConfig:
     global _governance_config
     if _governance_config is None:
-        _governance_config = _loader().get_config()
-        logger.info("governance config loaded: project=%s", _governance_config.project.name)
+        try:
+            loader = _loader()
+            loader.validate()  # raises if repo is not accessible
+            _governance_config = loader.get_config()
+            logger.info("governance config loaded: project=%s", _governance_config.project.name)
+        except Exception as exc:
+            mode = settings.on_unavailable.lower()
+            if mode == "warn":
+                logger.warning(
+                    "governance repo unavailable — continuing with empty config "
+                    "(NOMOS_ON_UNAVAILABLE=warn): %s",
+                    exc,
+                )
+                _governance_config = GovernanceConfig()
+            else:
+                raise RuntimeError(
+                    f"Governance repo unavailable and NOMOS_ON_UNAVAILABLE="
+                    f"{settings.on_unavailable!r} (set to 'warn' to proceed "
+                    f"without governance). Cause: {exc}"
+                ) from exc
     return _governance_config
 
 
