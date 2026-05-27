@@ -1,11 +1,12 @@
 import re
 from src.models.validation import ValidationResult
 from src.models.config import SAConfig
+from src.validators.rollout import apply_rollout
 
 _LOWERCASE_HYPHEN = re.compile(r"^[a-z0-9-]+$")
 
 
-def validate_sa_name(name: str, config: SAConfig) -> ValidationResult:
+def validate_sa_name(name: str, config: SAConfig, *, team: str | None = None) -> ValidationResult:
     """Validate a service account key name (as used in rbac.hcl)."""
     errors: list[str] = []
 
@@ -28,7 +29,7 @@ def validate_sa_name(name: str, config: SAConfig) -> ValidationResult:
             f"service account name too short; expected at least "
             f"{config.prefix}{{domain}}-{{system}}-{{env}}"
         )
-        return ValidationResult(valid=False, errors=errors)
+        return apply_rollout(ValidationResult(valid=False, errors=errors), config.rollout, team)
 
     # Debug SA: ends with {env}-{debug_suffix} — check env is parts[-2]
     if parts[-1] == config.debug_suffix:
@@ -63,4 +64,8 @@ def validate_sa_name(name: str, config: SAConfig) -> ValidationResult:
                     f"{', '.join(config.connector_directions)}, got '{direction}'"
                 )
 
-    return ValidationResult(valid=len(errors) == 0, errors=errors)
+    return apply_rollout(
+        ValidationResult(valid=len(errors) == 0, errors=errors),
+        config.rollout,
+        team,
+    )

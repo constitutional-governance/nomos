@@ -1,11 +1,23 @@
 from pydantic import BaseModel, Field
 
 
+class RolloutConfig(BaseModel):
+    """Controls gradual rollout of a governance rule to specific teams.
+
+    phase: "canary" — rule is only enforced for teams listed in ``teams``.
+           All other teams receive a warning instead of an error.
+    phase: "stable" (default) — rule is enforced for every team (normal behaviour).
+    """
+    phase: str = "stable"   # "stable" | "canary"
+    teams: list[str] = []   # teams under full enforcement during canary phase
+
+
 class TopicConfig(BaseModel):
     segment_count: int = 7
     prefixes: list[str] = []
     non_production_prefixes: list[str] = ["dev"]
     max_length: int = 249
+    rollout: RolloutConfig | None = None
 
 
 class RBACConfig(BaseModel):
@@ -14,6 +26,7 @@ class RBACConfig(BaseModel):
     admin_roles: list[str] = ["DeveloperManage"]
     admin_resource_types: list[str] = ["cluster"]
     cluster_resource_name: str = "kafka-cluster"
+    rollout: RolloutConfig | None = None
 
 
 class SAConfig(BaseModel):
@@ -21,6 +34,7 @@ class SAConfig(BaseModel):
     valid_envs: list[str] = []
     connector_directions: list[str] = ["source", "sink"]
     debug_suffix: str = "debug"
+    rollout: RolloutConfig | None = None
 
 
 class SchemaConfig(BaseModel):
@@ -33,6 +47,7 @@ class SchemaConfig(BaseModel):
     ]
     default_format: str = "AVRO"
     default_compatibility_level: str = "BACKWARD"
+    rollout: RolloutConfig | None = None
 
 
 class CamelConfig(BaseModel):
@@ -53,11 +68,13 @@ class RestApiConfig(BaseModel):
     version_prefix: str = "v"
     require_version: bool = True
     allowed_methods: list[str] = ["GET", "POST", "PUT", "PATCH", "DELETE"]
+    rollout: RolloutConfig | None = None
 
 
 class ServiceConfig(BaseModel):
     name_pattern: str = r"^[a-z][a-z0-9-]{1,61}[a-z0-9]$"
     max_length: int = 63
+    rollout: RolloutConfig | None = None
 
 
 class ProjectConfig(BaseModel):

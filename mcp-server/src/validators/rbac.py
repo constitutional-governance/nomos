@@ -1,5 +1,6 @@
 from src.models.validation import ValidationResult
 from src.models.config import RBACConfig
+from src.validators.rollout import apply_rollout
 
 
 def validate_rbac_binding(
@@ -7,6 +8,8 @@ def validate_rbac_binding(
     resource_type: str,
     resource_name: str,
     config: RBACConfig,
+    *,
+    team: str | None = None,
 ) -> ValidationResult:
     errors: list[str] = []
     valid_roles = set(config.valid_roles)
@@ -39,4 +42,8 @@ def validate_rbac_binding(
             f"'{config.cluster_resource_name}', got '{resource_name}'"
         )
 
-    return ValidationResult(valid=len(errors) == 0, errors=errors)
+    return apply_rollout(
+        ValidationResult(valid=len(errors) == 0, errors=errors),
+        config.rollout,
+        team,
+    )

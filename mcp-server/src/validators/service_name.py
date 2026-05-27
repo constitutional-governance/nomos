@@ -1,9 +1,10 @@
 import re
 from src.models.validation import ValidationResult
 from src.models.config import ServiceConfig
+from src.validators.rollout import apply_rollout
 
 
-def validate_service_name(name: str, config: ServiceConfig) -> ValidationResult:
+def validate_service_name(name: str, config: ServiceConfig, *, team: str | None = None) -> ValidationResult:
     errors: list[str] = []
     warnings: list[str] = []
 
@@ -30,4 +31,8 @@ def validate_service_name(name: str, config: ServiceConfig) -> ValidationResult:
     if name.count("-") == 0:
         warnings.append("single-segment name — consider '{domain}-{system}' pattern for clarity")
 
-    return ValidationResult(valid=not errors, errors=errors, warnings=warnings)
+    return apply_rollout(
+        ValidationResult(valid=not errors, errors=errors, warnings=warnings),
+        config.rollout,
+        team,
+    )

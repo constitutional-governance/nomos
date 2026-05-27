@@ -1,19 +1,24 @@
 import re
 from src.models.validation import ValidationResult
 from src.models.config import RestApiConfig
+from src.validators.rollout import apply_rollout
 
 _VERSION_RE = re.compile(r"^v\d+$")
 _KEBAB_SEGMENT_RE = re.compile(r"^[a-z][a-z0-9-]*$")
 _PATH_PARAM_RE = re.compile(r"^\{[a-z][a-zA-Z0-9_]*\}$")
 
 
-def validate_rest_path(path: str, config: RestApiConfig) -> ValidationResult:
+def validate_rest_path(path: str, config: RestApiConfig, *, team: str | None = None) -> ValidationResult:
     errors: list[str] = []
     warnings: list[str] = []
 
     if not path.startswith("/"):
         errors.append("path must start with '/'")
-        return ValidationResult(valid=False, errors=errors, warnings=warnings)
+        return apply_rollout(
+            ValidationResult(valid=False, errors=errors, warnings=warnings),
+            config.rollout,
+            team,
+        )
 
     if len(path) > 1 and path.endswith("/"):
         errors.append("trailing slash is not allowed")
@@ -26,7 +31,11 @@ def validate_rest_path(path: str, config: RestApiConfig) -> ValidationResult:
         errors.append("path must be lowercase — use kebab-case for all static segments")
 
     if not segments:
-        return ValidationResult(valid=not errors, errors=errors, warnings=warnings)
+        return apply_rollout(
+            ValidationResult(valid=not errors, errors=errors, warnings=warnings),
+            config.rollout,
+            team,
+        )
 
     if config.require_version:
         first = segments[0]
@@ -50,4 +59,8 @@ def validate_rest_path(path: str, config: RestApiConfig) -> ValidationResult:
                 f"segment '{seg}' looks like a singular noun — REST resource collections should be plural"
             )
 
-    return ValidationResult(valid=not errors, errors=errors, warnings=warnings)
+    return apply_rollout(
+        ValidationResult(valid=not errors, errors=errors, warnings=warnings),
+        config.rollout,
+        team,
+    )

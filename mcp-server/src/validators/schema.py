@@ -1,11 +1,14 @@
 from src.models.validation import ValidationResult
 from src.models.config import SchemaConfig
+from src.validators.rollout import apply_rollout
 
 
 def validate_schema_entry(
     format: str,
     compatibility_level: str,
     config: SchemaConfig,
+    *,
+    team: str | None = None,
 ) -> ValidationResult:
     errors: list[str] = []
     warnings: list[str] = []
@@ -27,4 +30,8 @@ def validate_schema_entry(
             "prefer BACKWARD or BACKWARD_TRANSITIVE for production AVRO schemas"
         )
 
-    return ValidationResult(valid=len(errors) == 0, errors=errors, warnings=warnings)
+    return apply_rollout(
+        ValidationResult(valid=len(errors) == 0, errors=errors, warnings=warnings),
+        config.rollout,
+        team,
+    )
