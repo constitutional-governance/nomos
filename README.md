@@ -108,10 +108,17 @@ nomos install-hooks --server https://governance.acme.com --project-dir /path/to/
 
 | Tool | Purpose |
 |---|---|
-| `validate_topic_name(name)` | Validate topic name against governance.yml |
-| `validate_rbac_binding(role, type, name)` | Validate an RBAC binding |
-| `validate_sa_name(name)` | Validate a service account name |
-| `validate_schema_entry(format, compatibility_level)` | Validate a Schema Registry entry |
+| `validate_topic_name(name, team?)` | Validate topic name against governance.yml |
+| `validate_rbac_binding(role, type, name, team?)` | Validate an RBAC binding |
+| `validate_sa_name(name, team?)` | Validate a service account name |
+| `validate_schema_entry(format, compatibility_level, team?)` | Validate a Schema Registry entry |
+| `validate_rest_path(path, team?)` | Validate a REST API path |
+| `validate_service_name(name, team?)` | Validate a microservice name |
+| `get_rollout_status(rule_name)` | Query canary rollout phase for a rule |
+
+All `validate_*` tools accept an optional `team` parameter. When the rule is in `canary` phase, canary teams receive errors; all other teams receive a warning instead (`valid: true`). Omitting `team` is treated as "not in canary" (advisory warning).
+
+`rule_name` for `get_rollout_status` is one of: `kafka.topic`, `kafka.rbac`, `kafka.service_account`, `kafka.schema_registry`, `rest_api`, `service`.
 
 ### Recommended agent workflow
 
@@ -231,6 +238,60 @@ governance-repo/
 ```
 
 Use [nomos-template](https://github.com/your-org/nomos-template) as your starting point.
+
+---
+
+## Canary Rollout
+
+Rule changes can be rolled out gradually to specific teams before they are enforced for everyone. Add a `rollout:` block to any rule section in `governance.yml`:
+
+```yaml
+kafka:
+  topic:
+    segment_count: 7
+    prefixes: [raw, public, ready, private, dev]
+    rollout:
+      phase: canary          # canary | stable
+      teams:
+        - payments           # these teams receive errors on violation
+        - platform           # all other teams receive a warning instead
+```
+
+**Behaviour by phase:**
+
+| Phase | Canary team | Non-canary team | No team supplied |
+|---|---|---|---|
+| `stable` (default) | error | error | error |
+| `canary` | error | warning (`valid: true`) | warning (`valid: true`) |
+
+When a rule is in canary and the team is not in the list, `validate_*` returns:
+
+```json
+{
+  "valid": true,
+  "errors": [],
+  "warnings": [
+    "[canary rollout] expected 7 dot-separated segments, got 3",
+    "rule is in canary rollout, not yet enforced for team 'fulfillment' (enforced for: payments, platform)"
+  ]
+}
+```
+
+Use `get_rollout_status(rule_name)` to discover the current phase before validating:
+
+```json
+{ "rule_name": "kafka.topic", "phase": "canary", "teams": ["payments", "platform"], "enforced_for_all": false }
+```
+
+**Rollout lifecycle:**
+
+```
+1. Add rollout: {phase: canary, teams: [team-a]}   ← test with pilot team
+2. Expand teams list as teams adopt the rule
+3. Set phase: stable (or remove rollout block)     ← enforce for all
+```
+
+The `team` parameter can be passed explicitly to all `validate_*` MCP tools and REST endpoints (`"team": "payments"` in the JSON body). When calling via `/teams/<team>/mcp`, the team is resolved automatically from the URL.
 
 ---
 
