@@ -12,6 +12,9 @@ build/
 mcp-server/.env
 .env
 
+# Local MCP configuration (server URL is environment-specific)
+.mcp.json
+
 # IDE
 .idea/
 .vscode/
