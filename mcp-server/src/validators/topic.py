@@ -1,11 +1,12 @@
 import re
 from src.models.validation import ValidationResult
 from src.models.config import TopicConfig
+from src.validators.rollout import apply_rollout
 
 _VERSION_RE = re.compile(r"^v\d+$")
 
 
-def validate_topic_name(name: str, config: TopicConfig) -> ValidationResult:
+def validate_topic_name(name: str, config: TopicConfig, *, team: str | None = None) -> ValidationResult:
     errors: list[str] = []
     warnings: list[str] = []
 
@@ -42,4 +43,8 @@ def validate_topic_name(name: str, config: TopicConfig) -> ValidationResult:
         if "-" in seg:
             errors.append(f"segment {i + 1} ('{seg}') contains a hyphen — use dots only")
 
-    return ValidationResult(valid=len(errors) == 0, errors=errors, warnings=warnings)
+    return apply_rollout(
+        ValidationResult(valid=len(errors) == 0, errors=errors, warnings=warnings),
+        config.rollout,
+        team,
+    )

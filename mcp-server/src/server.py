@@ -9,7 +9,8 @@ from src.models.convention import NamingConvention, KafkaConventions, CamelConve
 from src.models.check import Check
 from src.models.helm import HelmTemplate, HelmServiceType
 from src.models.validation import ValidationResult
-from src.tools import adr_tools, constitution_tools, convention_tools, check_tools, helm_tools, knowledge_tools
+from src.models.rollout import RolloutStatus
+from src.tools import adr_tools, constitution_tools, convention_tools, check_tools, helm_tools, knowledge_tools, rollout_tools
 from src.validators import topic as topic_validator, rbac as rbac_validator, sa_naming as sa_validator, schema as schema_validator, rest_path as rest_path_validator, service_name as service_name_validator
 
 logger = logging.getLogger(__name__)
@@ -234,72 +235,105 @@ def get_helm_template(service_type: HelmServiceType) -> HelmTemplate:
 
 
 # ── Validation tools ───────────────────────────────────────────────────────────
+#
+# All validate_* tools accept an optional `team` parameter.
+# When supplied, canary-phase rules are enforced only for listed teams;
+# all other teams receive a warning instead of an error.
+# Team is also resolved automatically from the URL when accessed via
+# /teams/<team>/mcp (set by TeamContextMiddleware).
+
+def _resolve_team(explicit: str | None) -> str | None:
+    """Return explicit team if given, else fall back to the URL-routed team context."""
+    from src.context import _current_team
+    return explicit or _current_team.get()
+
 
 @mcp.tool(description=(
     "Validate a topic name against the rules in governance.yml. "
     "Checks segment count, valid prefix, version suffix, lowercase, no hyphens, max length. "
-    "Returns valid=true or a list of errors."
+    "Returns valid=true or a list of errors. "
+    "Pass team to apply canary-rollout rules: canary teams get errors, others get warnings."
 ))
-def validate_topic_name(name: str) -> ValidationResult:
-    logger.info("validate_topic_name name=%s", name)
-    return topic_validator.validate_topic_name(name, _config().kafka.topic)
+def validate_topic_name(name: str, team: str | None = None) -> ValidationResult:
+    logger.info("validate_topic_name name=%s team=%s", name, team)
+    return topic_validator.validate_topic_name(name, _config().kafka.topic, team=_resolve_team(team))
 
 
 @mcp.tool(description=(
     "Validate a single RBAC binding (role_name + resource_type + resource_name) "
     "against the rules in governance.yml. "
-    "Use before adding any role_binding to a service account or identity pool."
+    "Use before adding any role_binding to a service account or identity pool. "
+    "Pass team to apply canary-rollout rules."
 ))
 def validate_rbac_binding(
     role_name: str,
     resource_type: str,
     resource_name: str,
+    team: str | None = None,
 ) -> ValidationResult:
-    logger.info("validate_rbac_binding role=%s type=%s name=%s", role_name, resource_type, resource_name)
+    logger.info("validate_rbac_binding role=%s type=%s name=%s team=%s", role_name, resource_type, resource_name, team)
     return rbac_validator.validate_rbac_binding(
-        role_name, resource_type, resource_name, _config().kafka.rbac
+        role_name, resource_type, resource_name, _config().kafka.rbac, team=_resolve_team(team)
     )
 
 
 @mcp.tool(description=(
     "Validate a service account name against the naming rules in governance.yml. "
-    "Checks prefix, environment suffix, connector direction, and debug suffix."
+    "Checks prefix, environment suffix, connector direction, and debug suffix. "
+    "Pass team to apply canary-rollout rules."
 ))
-def validate_sa_name(name: str) -> ValidationResult:
-    logger.info("validate_sa_name name=%s", name)
-    return sa_validator.validate_sa_name(name, _config().kafka.service_account)
+def validate_sa_name(name: str, team: str | None = None) -> ValidationResult:
+    logger.info("validate_sa_name name=%s team=%s", name, team)
+    return sa_validator.validate_sa_name(name, _config().kafka.service_account, team=_resolve_team(team))
 
 
 @mcp.tool(description=(
     "Validate a Schema Registry entry: format and compatibility_level. "
     "format must be AVRO, JSON, or PROTOBUF. "
     "compatibility_level must be one of the valid SR levels from governance.yml. "
-    "Use before adding or modifying any schemas.hcl entry."
+    "Use before adding or modifying any schemas.hcl entry. "
+    "Pass team to apply canary-rollout rules."
 ))
-def validate_schema_entry(format: str, compatibility_level: str) -> ValidationResult:
-    logger.info("validate_schema_entry format=%s compatibility_level=%s", format, compatibility_level)
-    return schema_validator.validate_schema_entry(format, compatibility_level, _config().kafka.schema_registry)
+def validate_schema_entry(format: str, compatibility_level: str, team: str | None = None) -> ValidationResult:
+    logger.info("validate_schema_entry format=%s compatibility_level=%s team=%s", format, compatibility_level, team)
+    return schema_validator.validate_schema_entry(format, compatibility_level, _config().kafka.schema_registry, team=_resolve_team(team))
 
 
 @mcp.tool(description=(
     "Validate a REST API path against the conventions in governance.yml. "
     "Checks: starts with /, version prefix (/v1/), lowercase kebab-case segments, "
     "no trailing slash, plural resource names. "
-    "Returns valid=true or a list of errors and warnings."
+    "Returns valid=true or a list of errors and warnings. "
+    "Pass team to apply canary-rollout rules."
 ))
-def validate_rest_path(path: str) -> ValidationResult:
-    logger.info("validate_rest_path path=%s", path)
-    return rest_path_validator.validate_rest_path(path, _config().rest_api)
+def validate_rest_path(path: str, team: str | None = None) -> ValidationResult:
+    logger.info("validate_rest_path path=%s team=%s", path, team)
+    return rest_path_validator.validate_rest_path(path, _config().rest_api, team=_resolve_team(team))
 
 
 @mcp.tool(description=(
     "Validate a microservice name against the conventions in governance.yml. "
     "Checks: lowercase, kebab-case, no underscores, max 63 chars (k8s DNS label limit). "
-    "Returns valid=true or a list of errors and warnings."
+    "Returns valid=true or a list of errors and warnings. "
+    "Pass team to apply canary-rollout rules."
 ))
-def validate_service_name(name: str) -> ValidationResult:
-    logger.info("validate_service_name name=%s", name)
-    return service_name_validator.validate_service_name(name, _config().service)
+def validate_service_name(name: str, team: str | None = None) -> ValidationResult:
+    logger.info("validate_service_name name=%s team=%s", name, team)
+    return service_name_validator.validate_service_name(name, _config().service, team=_resolve_team(team))
+
+
+# ── Rollout tools ──────────────────────────────────────────────────────────────
+
+@mcp.tool(description=(
+    "Return the current rollout phase and canary teams for a governance rule. "
+    "rule_name is one of: kafka.topic, kafka.rbac, kafka.service_account, "
+    "kafka.schema_registry, rest_api, service. "
+    "Use this to discover whether a rule is in canary rollout before validating "
+    "resources, so you can set the correct expectations."
+))
+def get_rollout_status(rule_name: str) -> RolloutStatus:
+    logger.info("get_rollout_status rule_name=%s", rule_name)
+    return rollout_tools.get_rollout_status(rule_name, _config())
 
 
 # ── Knowledge tools ────────────────────────────────────────────────────────────

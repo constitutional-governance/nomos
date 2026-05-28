@@ -27,6 +27,14 @@ kafka:
       - dev
     # Maximum topic name length (Kafka hard limit)
     max_length: 249
+    # Optional: roll out rule changes gradually before enforcing for all teams.
+    # phase: canary  → only teams listed below get errors; others get warnings.
+    # phase: stable  → rule is enforced for everyone (default when absent).
+    # rollout:
+    #   phase: canary
+    #   teams:
+    #     - payments
+    #     - platform
 
   rbac:
     # RBAC role names — adapt for your platform (e.g. MSK IAM actions)
