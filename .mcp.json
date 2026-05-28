@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "nomos": {
+      "type": "http",
+      "url": "https://nomos-f3vy.onrender.com/mcp"
+    }
+  }
+}
