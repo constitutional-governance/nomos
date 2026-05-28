@@ -67,10 +67,18 @@ nomos-validate topic raw.payments.pos.checkout.receipts.transaction.v1
 nomos-validate rbac DeveloperRead topic "raw.payments.*"
 nomos-validate sa sa-payments-connector-source-jdbc-prod
 nomos-validate schema AVRO BACKWARD
+nomos-validate rest-path "/v1/orders/{orderId}/items"
+nomos-validate service-name "payments-checkout-api"
 
 # Validate resources (remote mode — delegates to shared server)
 nomos-validate --server https://governance.acme.com topic raw.payments...
 nomos-validate --server https://governance.acme.com schema AVRO BACKWARD_TRANSITIVE
+nomos-validate --server https://governance.acme.com rest-path "/v1/orders/{orderId}/items"
+nomos-validate --server https://governance.acme.com service-name "payments-checkout-api"
+
+# Canary rollout — pass --team to apply rollout rules
+nomos-validate --team payments topic "raw.payments.checkout.v1"
+nomos-validate --server https://governance.acme.com --team payments sa "sa-payments-producer-prod"
 
 # Install .mcp.json + pre-commit hook in a project repo
 nomos install-hooks --server https://governance.acme.com --project-dir /path/to/repo
@@ -90,6 +98,8 @@ nomos install-hooks --server https://governance.acme.com --project-dir /path/to/
 | `get_active_rules()` | Full governance.yml as structured object |
 | `get_constitution(domain)` | Domain principles — `"global"`, `"kafka"`, etc. |
 | `get_kafka_conventions()` | Topic naming, RBAC, schema subjects, consumer groups, prefix semantics |
+| `get_rest_conventions()` | Resource naming, URL path pattern, versioning strategy, HTTP method semantics |
+| `get_service_conventions()` | Microservice name pattern, max length, Kubernetes constraints |
 | `get_camel_conventions()` | Route IDs, application names, base class, BOM |
 | `get_naming_conventions(type)` | Pattern + examples for one resource type |
 | `get_knowledge(topic)` | Knowledge documents — call `get_knowledge("failures")` before generating resources |
@@ -102,6 +112,7 @@ nomos install-hooks --server https://governance.acme.com --project-dir /path/to/
 | `search_adrs(query)` | Full-text search across ADRs |
 | `list_adrs()` | All governance decisions |
 | `get_checks(domain)` | Gherkin checks for a domain |
+| `get_springboot_checks()` | SpringBoot required config checks (actuator, health probes, Kafka connectivity) |
 | `get_helm_template(service_type)` | Helm values template |
 
 ### Validation
@@ -137,6 +148,8 @@ Before generating any resource:
 | `/validate/rbac` | POST | `{"role_name": "...", "resource_type": "...", "resource_name": "..."}` |
 | `/validate/sa` | POST | `{"name": "..."}` |
 | `/validate/schema` | POST | `{"format": "AVRO", "compatibility_level": "BACKWARD"}` |
+| `/validate/rest-path` | POST | `{"path": "/v1/orders/{orderId}/items"}` |
+| `/validate/service-name` | POST | `{"name": "payments-checkout-api"}` |
 | `/webhook/github` | POST | Invalidates cache on push |
 | `/webhook/incident` | POST | Report a violation → opens a PR against the governance repo |
 
@@ -201,6 +214,26 @@ When a governance violation reaches production (caught by CI, a pre-commit hook,
         "correct_pattern": "${{ env.CORRECT_PATTERN }}"
       }'
 ```
+
+---
+
+## Availability and failure modes
+
+By default, Nomos **fails closed**: if the governance repo cannot be loaded (path missing, GitHub unreachable), every MCP tool and REST endpoint returns an error. Agents cannot proceed until the repo is accessible.
+
+Set `NOMOS_ON_UNAVAILABLE` to change this behaviour:
+
+| Value | Behaviour | Use case |
+|---|---|---|
+| `fail` (default) | Raises `RuntimeError`. No tool or endpoint returns a result. | Production — prevents agents from generating resources without governance. |
+| `warn` | Logs a warning, returns empty `GovernanceConfig()`. All validators pass with empty rules. | Advisory / development — governance is informational, not blocking. |
+
+```bash
+# Advisory mode — governance unavailability is a warning, not an error
+NOMOS_ON_UNAVAILABLE=warn nomos --repo /path/to/governance-repo
+```
+
+**Note**: in `warn` mode all validators will pass (empty config means no rules are enforced). Use only in environments where governance is informational.
 
 ---
 
